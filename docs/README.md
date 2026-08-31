@@ -24,6 +24,18 @@ In "Dojo of Death," you take on the role of a white ninja facing relentless wave
 
 We hope you enjoy playing "Dojo of Death" and find value in exploring the HaxeFlixel implementation. Have fun and embrace the way of the ninja!
 
+## Requirements & Compatibility
+
+- **Haxe:** 4.x+
+- **HaxeFlixel:** 5.x+
+- **Target Platforms:** HTML5, Desktop (Windows / macOS / Linux)
+
+## Versioning & Changelog
+
+Current Version: **v1.0.1**
+
+For a detailed list of changes and version history, see the [CHANGELOG.md](CHANGELOG.md).
+
 ## License
 
 This project is licensed under **a special version of the [MIT License](LICENSE.md)**. Make sure you read it before using or modifying this project. Please also read the [DISCLAIMER](DISCLAIMER.md) before proceeding.

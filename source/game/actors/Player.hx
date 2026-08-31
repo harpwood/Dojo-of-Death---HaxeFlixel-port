@@ -188,8 +188,8 @@ class Player extends Actor
 	override public function update(elapsed:Float):Void
 	{
 		// Update the mouse position
-		mouse.x = FlxG.mouse.screenX;
-		mouse.y = FlxG.mouse.screenY;
+        mouse.x = FlxG.mouse.viewX;
+        mouse.y = FlxG.mouse.viewY;
 
 		// Handle different player states
 		switch (state)

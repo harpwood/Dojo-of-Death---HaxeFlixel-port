@@ -1,2 +1,14 @@
-#Ignore export folder
+# Build output & caches
 /export
+export/
+.lime/
+
+# System files
+.DS_Store
+Thumbs.db
+ehthumbs.db
+
+# IDE / Editor configuration & cache
+.vscode/
+.idea/
+*.user

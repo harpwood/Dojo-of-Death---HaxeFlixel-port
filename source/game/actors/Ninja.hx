@@ -247,7 +247,7 @@ class Ninja extends Actor
 		shadow.animation.play(animNames[animFacingIndex][ANIM_DEATH]);
 
 		// Callback function to handle the logic when death animation ends
-		actor.animation.finishCallback = function(s:String):Void
+		actor.animation.onFinish.add(function(s:String):Void
 		{
 			actor.animation.stop();
 			updatePosition();
@@ -256,7 +256,7 @@ class Ninja extends Actor
 			actor.animation.play(animNames[animFacingIndex][DEAD_ANIM]);
 			shadow.animation.play(animNames[animFacingIndex][DEAD_ANIM]);
 			state = State.DEAD;
-		};
+		});
 
 		// Add a strike effect at the ninja's position
 		game.addStrike(actor.x, actor.y);

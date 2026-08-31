@@ -793,7 +793,7 @@ class GameState extends FlxState
 		uiCamera.bgColor = FlxColor.TRANSPARENT;
 
 		// Set the filters for the game camera and enable them
-		gCamera.setFilters(filters);
+		gCamera.filters = filters;
 		gCamera.filtersEnabled = true;
 
 		// Disable the filters for the UI camera
@@ -844,9 +844,9 @@ class GameState extends FlxState
 		var filters:Array<BitmapFilter> = [blurFilter, grayScaleFilter];
 		
 		// Set the filters on the game camera
-		gCamera.setFilters(filters);
-		
+		gCamera.filters = filters;
+
 		// No filters on the UI camera
-		uiCamera.setFilters([]);
+		uiCamera.filters= [];
 	}
 }
