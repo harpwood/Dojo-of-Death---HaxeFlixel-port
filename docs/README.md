@@ -34,7 +34,7 @@ We hope you enjoy playing "Dojo of Death" and find value in exploring the HaxeFl
 
 Current Version: **v1.0.1**
 
-For a detailed list of changes and version history, see the [CHANGELOG.md](CHANGELOG.md).
+For a detailed list of changes and version history, see the [CHANGELOG.md](../CHANGELOG.md).
 
 ## License
 
