@@ -39,12 +39,25 @@ class UserInput
 	{
 		this.game = game;
 
-		// Create a FlxSprite as input layer sprite to capture mouse events
+		// Create a FlxSprite as input layer sprite to capture mouse events.
+		// Solid black and covers the whole screen, but this is created first
+		// in GameState.create() (before Background and everything else), so
+		// every later-added object draws on top of it - it's never actually
+		// visible, just present to catch clicks anywhere on screen.
 		inputLayer = new FlxSprite();
 		inputLayer.makeGraphic(FlxG.width, FlxG.height, FlxColor.BLACK);
 		this.game.add(inputLayer);
 
-		// Register the onMouseDown callback for mouse events on the input layer
+		// Register the onMouseDown callback for mouse events on the input layer.
+		// Signature (checked against the installed Flixel version): add(object,
+		// onMouseDown, onMouseUp, onMouseOver, onMouseOut, mouseChildren=false,
+		// mouseEnabled=true, pixelPerfect=true, mouseButtons). Only onMouseDown
+		// is used here (the rest are null); mouseChildren=false since this
+		// plain sprite has no children; mouseEnabled=true is explicit but
+		// matches the default anyway. pixelPerfect is left at its default
+		// (true), though it makes no practical difference here since
+		// inputLayer is fully opaque everywhere - pixel-perfect and
+		// bounding-box hit-testing agree on a sprite with no transparent pixels.
 		FlxMouseEvent.add(inputLayer, onMouseDown, null, null, null, false, true);
 
 		isPaused = false;
@@ -53,6 +66,8 @@ class UserInput
 
 	/**
 	 * Handles the onMouseDown event when the user clicks on the input layer.
+	 * Case labels are raw ints matching State.* (see State.hx), same pattern
+	 * as the other state-machine switches in this codebase.
 	 *
 	 * @param sprite The sprite that triggered the mouse event.
 	 */
@@ -98,7 +113,11 @@ class UserInput
 			// Toggle the music mute state
 			Audio.isMusicOn = !Audio.isMusicOn;
 
-			// Mute/unmute the music only during gameplay and when the player is alive
+			// Mute/unmute the music only during gameplay and when the player is alive.
+			// Caution: see the warning on Audio.isMusicPlaying()/resumeMusic() -
+			// if music was disabled before gameplay ever started, this branch
+			// (specifically isMusicPlaying() below) can throw on a null
+			// FlxG.sound.music. Not fixed here, just noting the reachable path.
 			if (game.getState() == State.PLAY  && game.player.alive)
 			{
 				// Check if the music is playing and mute or unmute accordingly

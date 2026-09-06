@@ -20,9 +20,9 @@ import game.util.GEA;
 import game.util.State;
 
 /**
- * Represents an arrow projectile in the game.
- * It is stored in a pool available to reused.
- * It provides movement and colision with the player.
+ * A bow ninja's arrow projectile. Same pooling pattern as `Blood`
+ * (see Blood.hx's class doc). Flies in a straight line and checks for a
+ * collision with the Player each frame.
  */
 class Arrow extends FlxSprite
 {
@@ -102,13 +102,22 @@ class Arrow extends FlxSprite
 		x += Math.cos(arrowAngle) * arrowSpeed * elapsed;
 		y += Math.sin(arrowAngle) * arrowSpeed * elapsed;
 
-		// Check collision with the player and if the player is alive
+		// Check collision with the player and if the player is alive.
+		// Note: `distance` is assigned INSIDE the if-condition here (Haxe
+		// assignment expressions return the assigned value), so this reads as
+		// "compute distance, then check both it and player.alive" in one line.
 		var dx:Float = this.x - game.player.x;
 		var dy:Float = this.y - game.player.y;
 		var distance:Float;
 		if ((distance = Math.sqrt(dx * dx + dy * dy)) < 20 && game.player.alive)
 		{
-			// Handle collision with the player based on the player's state
+			// 20px here is the arrow's own hit-radius against the player -
+			// unrelated to Actor.meleeReach, which only applies to melee weapons.
+			//
+			// Parry window: the player can deflect the arrow not just while
+			// actively ATTACK-ing, but also during the brief COOLDOWN right
+			// after - the sword is still effectively "up" during that recovery,
+			// so an incoming arrow gets knocked away instead of landing a hit.
 			if (game.player.state == State.ATTACK || game.player.state == State.COOLDOWN)
 			{
 				// If the player is attacking or in cooldown state, break the arrow and deinitialize it
@@ -116,7 +125,7 @@ class Arrow extends FlxSprite
 				game.addArrowBroken(Direction.RIGHT, x, y);
 				deInitialize();
 				
-				// Play the apropriate sound
+				// Play the appropriate sound
 				Audio.playBowHit();
 			}
 			else
@@ -133,7 +142,7 @@ class Arrow extends FlxSprite
 			// Deinitialize the arrow if it's outside the screen
 			deInitialize();
 			
-			// Play the apropriate sound
+			// Play the appropriate sound
 			Audio.playBowHit();
 		}
 

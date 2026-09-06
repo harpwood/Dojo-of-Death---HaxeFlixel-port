@@ -34,7 +34,15 @@ class Actor
 	// The parent FlxState instance that contains the Actor
 	var game:GameState;			
 
-	// animation indexes constants
+	/**
+	 * Animation slot indices. These aren't just internal labels - they're the exact
+	 * second-dimension index used both into `animNames` below AND into the
+	 * `animData`/`animFrameRate` arrays that `Player` and `Ninja` build and pass into
+	 * `bakeAnimations()`. All three arrays (animNames, animData, animFrameRate) must
+	 * keep their entries in this same 0-6 order, or animations will play the wrong
+	 * frames. See also `bakeAnimations()` below, which hardcodes `1` and `6`
+	 * (== ANIM_RUN and ANIM_CHARGE) to decide which animations loop.
+	 */
 	final ANIM_IDLE:Int 	= 0;
 	final ANIM_RUN:Int 		= 1;
 	final ANIM_ATTACK:Int 	= 2;
@@ -71,30 +79,36 @@ class Actor
 	final ANIM_BACK_CHARGE:String 	= "back_charge";
 
 	/**
-	* Example: animNames[animFacingIndex][ANIM_RUN]
-	* Plays the run animation based on the animFacingIndex.
+	* `animNames[facingIndex][animSlot]` gives the Flixel animation name to play.
 	*
-	* The animFacingIndex represents the facing direction:
-	*   - Side:   Facing.SIDE = 0
-	*   - Front:  Facing.FRONT = 1
-	*   - Back:   Facing.BACK = 2
+	* - First dimension (facingIndex): which way the actor is facing - use the
+	*   `Facing` constants (Facing.SIDE = 0, Facing.FRONT = 1, Facing.BACK = 2).
+	* - Second dimension (animSlot): which action - use the ANIM_* constants
+	*   above (ANIM_IDLE, ANIM_RUN, etc.).
 	*
-	* Note: For the left side, the side direction sprites are flipped.
+	* Example: `animNames[Facing.SIDE][ANIM_RUN]` → the side-facing run animation name.
+	* Built once in the constructor below; see that array literal for the actual names.
+	* Note: for SIDE, the same animation is used for both left and right - the sprite
+	* is simply flipped horizontally (see `facing()`), there's no separate "left" entry.
 	*/
 	var animNames: Array<Array<String>>; 	// Stores the animation names for different facing directions
-	var animFacingIndex: Int;				// Represents the index for the current facing direction
+	var animFacingIndex: Int;				// Current facing (a Facing.* value); selects the first dimension of animNames
 
 	/**
-	* Represents the current state of the Actor instance.
+	* Represents the current state of the Actor instance (Player or Ninja).
 	*
 	* Use the static constants in the State class to access the available states:
+	*   - No state: 	State.NO_STATE (set by `deInitialize()`; actor is done and being removed)
 	*   - Running: 		State.RUN
-	*   - Charging: 	State.CHARGE
+	*   - Charging: 	State.CHARGE (Ninja only - Player skips straight to ATTACK)
 	*   - Attacking: 	State.ATTACK
 	*   - Cooldown: 	State.COOLDOWN
 	*   - Death: 		State.DEATH
 	*   - Dead: 		State.DEAD
-	*   - Intro: 		State.INTRO
+	*
+	* Note: `State.INTRO`/`PLAY`/`GAME_OVER`/`RESET` are a *different*, unrelated
+	* group of constants used by `GameState.state`, not by this field - see the
+	* warning in `State.hx` about the two enumerations sharing integer values.
 	*/
 	public var state(default, null):Int;
 
@@ -138,11 +152,16 @@ class Actor
 	var attackLength:Float;		// The lenght of the time that must elapsed before attacking
 	var cooldownTimer:Float;	// The time that must elapse before the actor's cooldown period ends
 	var cooldownLength:Float;	// The duration of the cooldown period after an attack
-	var meleeReach:Int;			// The range of the melee attack reach, specifying how close the target must be for the attack to detect collision
+	var meleeReach:Int;			// Hit-detection radius: how close an actor's weapon must be to a target to actually land a hit (checked in Player/Ninja checkForKills()).
+									// NOT the same as Ninja's own `meleeRange`/`rangedRange` fields, which are AI engage distances
+									// (how close the player must get before a ninja starts charging an attack). Similar names, different purposes.
 
 	// Public instance properties specific to the Actor class (not related to actor:FlxSprite)
-	public var x(default, null):Float;		// The x position of the actor
-	public var y(default, null):Float;		// The y position of the actor
+	// Note: x/y are NOT computed live - they're a snapshot of actor.x/actor.y taken once per
+	// frame by updatePosition(). Prefer reading actor.x/actor.y directly if you need the
+	// absolute latest position within the same frame (e.g. right after moving `actor`).
+	public var x(default, null):Float;		// The x position of the actor (as of the last updatePosition() call)
+	public var y(default, null):Float;		// The y position of the actor (as of the last updatePosition() call)
 	public var angle(default, null):Float;	// The angle of direction of the actor
 	public var alive(default, null):Bool;	// A flag indicating whether the actor is alive or not
 
@@ -155,17 +174,9 @@ class Actor
 	{
 		this.game = game;
 
-		/**
-		* Defines the animation names for different facing directions of the actor.
-		*
-		* The animNames array is a 2D array where each sub-array represents the animation names for a specific facing direction.
-		* The index values correspond to the animation indexes/constants defined earlier.
-		*
-		* Example:
-		* - animNames[Facing.SIDE][ANIM_RUN] returns the animation name for the side-facing run animation.
-		*
-		* Note: The animation names should match the constants defined earlier for consistency.
-		*/
+		// Builds the animNames lookup described in its field doc above.
+		// Row order (SIDE, FRONT, BACK) must match Facing's constants;
+		// column order within each row must match the ANIM_* constants.
 		animNames = [
 			[
 				ANIM_SIDE_IDLE,
@@ -196,25 +207,11 @@ class Actor
 			]
 		];
 
-		/**
-		* Represents the current facing direction of the actor.
-		*
-		* Use the constants defined in the Facing class to set the facing direction:
-		* - Facing.SIDE for side-facing direction
-		* - Facing.FRONT for front-facing direction
-		* - Facing.BACK for back-facing direction
-		*
-		* The initial value is set to Facing.SIDE by default.
-		*/
+		// Default facing is SIDE (see animFacingIndex field doc above for what this means)
 		animFacingIndex = Facing.SIDE;
 
-		/**
-		* An array of color matrix filter values used to modify the appearance of the shadow.
-		* The color matrix filter is applied to the sprite to change its color to black and
-		* make it semi-transparent, creating a shadow effect.
-		*
-		* In this case, the alpha value (a) is set to 0.15 to create a semi-transparent shadow.
-		*/
+		// Builds the semi-transparent black matrix described in shadowColorMatrixFilter's
+		// field doc above: RGB rows all zero (forces black), alpha row set to 0.15.
 		var a = 0.15; //alpha
 		shadowColorMatrixFilter =  [
 			0, 0, 0, 0, 0,
@@ -227,7 +224,7 @@ class Actor
 		shadow = new FlxSprite(); 	 // Create a new FlxSprite instance to represent the shadow sprite for the actor
 		vector = new FlxPoint(0, 0); // Create a new FlxPoint instance to store the vector of the actor's movement
 		friction = 0.75; 			 // Set the friction value to control the actor's movement speed reduction
-		meleeReach = 30; 			 // Set the meleeReach value to specify the range of the melee attack reach, indicating how close the target must be for the attack to detect collision
+		meleeReach = 30; 			 // Default hit-detection radius (see meleeReach field doc above for how this differs from Ninja's meleeRange/rangedRange)
 	}
 	
 	/**
@@ -239,12 +236,15 @@ class Actor
 	 */
 
 	/**
-	* Initializes the player actor with the specified type.
+	* Base initialization shared by every actor (Player and Ninja alike).
+	* Currently just picks a random "dead" pose for variety.
 	*
-	* @param type The type of the player actor (optional, default value is 0).
+	* @param type For `Ninja`, selects SWORD vs BOW (see `Type` class); unused by `Player`.
 	*
-	* @note This method overrides the superclass's initialize method and can be
-	* further customized for player or enemy specific initialization logic.
+	* @note Both `Player.initialize()` and `Ninja.initialize()` override this and call
+	* `super.initialize()` first, then add their own actor-specific setup on top
+	* (position, speed, animations, etc.). This base version alone does not fully
+	* set up an actor.
 	*/
 	public function initialize(type:Int = 0):Void
 	{
@@ -308,139 +308,109 @@ class Actor
 	}
 
 	/**
-	* Determines the actor's facing direction based on its movement vector.
-	* Updates the actor's facing, shadow facing, and animFacingIndex accordingly.
+	* Determines the actor's facing direction based on its movement vector,
+	* and updates actor.facing, shadow.facing, and animFacingIndex to match.
 	*
-	*   @Note:  Upwards movement corresponds to the BACK  side animations,
-	*   while downwards movement corresponds to the FRONT side animations.
+	* Decision rule: horizontal movement (vector.x) decides left/right flip.
+	* Then, whichever of |vector.x| / |vector.y| is LARGER decides SIDE vs FRONT/BACK:
+	* moving mostly sideways → SIDE; mostly downward → FRONT; mostly upward → BACK.
+	* On an exact tie, SIDE wins (the vertical check requires strictly greater, not >=).
+	*
+	* See `facingRanged()` below for the same rule applied to a fixed target
+	* direction instead of the live movement vector.
 	*/
 	function facing():Void
 	{
-		// Check if the actor is moving towards the right
-		if (vector.x > 0)
+		if (vector.x > 0) // moving right
 		{
-			// Set the actor and shadow to face right
 			actor.facing = FlxDirectionFlags.RIGHT;
 			shadow.facing = FlxDirectionFlags.RIGHT;
-
-			// Set the animation facing index to the side direction
 			animFacingIndex = Facing.SIDE;
 
-			// Check if the actor is moving downwards
-			if (vector.y > 0)
+			if (vector.y > 0) // also moving down
 			{
-				// Determine facing direction based on the relative magnitude of vertical and horizontal movement
-				// Facing front if the vertical movement is greater than the horizontal movement
-				if (vector.y > vector.x)
-					animFacingIndex = Facing.FRONT;
+				if (vector.y > vector.x) animFacingIndex = Facing.FRONT;
 			}
-			// if the actor is moving upwards apply BACK facing
-			else if (Math.abs(vector.y) > vector.x)
+			else if (Math.abs(vector.y) > vector.x) // moving up, and mostly so
 				animFacingIndex = Facing.BACK;
 		}
-		else // if the actor is moving towards the left
+		else // moving left (or not moving horizontally at all)
 		{
-			// Set the actor and shadow to face left
 			actor.facing = FlxDirectionFlags.LEFT;
 			shadow.facing = FlxDirectionFlags.LEFT;
-			// Set the animation facing index to the side direction
 			animFacingIndex = Facing.SIDE;
 
-			// Check if the actor is moving downwards
-			if (vector.y > 0)
+			if (vector.y > 0) // also moving down
 			{
-				// Determine facing direction based on the relative magnitude of vertical and horizontal movement
-				// Facing front if the vertical movement is greater than the absolute value of the horizontal movement
-				if (vector.y > Math.abs(vector.x))
-					animFacingIndex = Facing.FRONT;
+				if (vector.y > Math.abs(vector.x)) animFacingIndex = Facing.FRONT;
 			}
-			// Check if the actor is moving upwards apply BACK facing for upwards movement
-			else if (Math.abs(vector.y) > Math.abs(vector.x))
+			else if (Math.abs(vector.y) > Math.abs(vector.x)) // moving up, and mostly so
 				animFacingIndex = Facing.BACK;
 		}
 
-		// If the facing is not SIDE (either to left or right)
+		// FRONT/BACK animations only have one drawn orientation, so always use the
+		// RIGHT-facing frames for them and rely on flipping only for true SIDE facing.
 		if (animFacingIndex > Facing.SIDE)
 		{
-			// Flip image horizontally if facing front or upwards
 			actor.facing = FlxDirectionFlags.RIGHT;
 			shadow.facing = FlxDirectionFlags.RIGHT;
 		}
 
-		// Ensure the shadow is always flipped vertically
+		// The shadow sprite is always vertically mirrored (it's drawn "upside down"
+		// beneath the actor), regardless of facing.
 		shadow.flipY = true;
 	}
 
 	/**
-	* Adjusts the facing direction of the actor for ranged attacks based on the relative position of a target.
-	* Updates the actor's facing, shadow facing, and animFacingIndex accordingly.
-	* 
-	*   @Note:  Upwards facing corresponds to the BACK  side animations,
-	*   while downwards facing corresponds to the FRONT side animations.
-	* 
+	* Same facing/animFacingIndex logic as `facing()` above, but driven by the
+	* direction toward a fixed `target` (dx/dy) instead of the live movement
+	* vector. Used by Ninja's bow-charge to keep facing the player while
+	* standing still. See `facing()` for the exact decision rule.
+	*
 	* @param target The target actor that the current actor is facing.
 	*/
 	public function facingRanged(target:Actor):Void
 	{
-		// Calculate the horizontal and vertical distance between the actor and the target
-		var dx:Float = target.x - actor.x;
-		var dy:Float = target.y - actor.y;
+		var dx:Float = target.x - actor.x; // horizontal distance to target
+		var dy:Float = target.y - actor.y; // vertical distance to target
 
-		// If the target is positioned to the right of the actor
-		if (dx > 0)
+		if (dx > 0) // target is to the right
 		{
-			// Set the actor and shadow to face right
 			actor.facing = FlxDirectionFlags.RIGHT;
 			shadow.facing = FlxDirectionFlags.RIGHT;
-
-			// Set the animation facing index to the side direction
 			animFacingIndex = Facing.SIDE;
 
-			// If the target is positioned below the actor
-			if (dy > 0)
+			if (dy > 0) // target is also below
 			{
-				// Determine facing direction based on the relative magnitude of vertical and horizontal distance
-				// Facing front if the vertical distance is greater than the horizontal distance
-				if (dy > dx)
-					animFacingIndex = Facing.FRONT;
+				if (dy > dx) animFacingIndex = Facing.FRONT;
 			}
-			// If the target is positioned above the actor apply BACK facing
-			else if (Math.abs(dy) > dx)
+			else if (Math.abs(dy) > dx) // target is above, and mostly so
 			{
 				animFacingIndex = Facing.BACK;
 			}
 		}
-		else // If the target is positioned to the left of the actor
+		else // target is to the left (or directly above/below)
 		{
-			// Set the actor and shadow to face left
 			actor.facing = FlxDirectionFlags.LEFT;
 			shadow.facing = FlxDirectionFlags.LEFT;
-			// Set the animation facing index to the side direction
 			animFacingIndex = Facing.SIDE;
 
-			// If the target is positioned below the actor
-			if (dy > 0)
+			if (dy > 0) // target is also below
 			{
-				// Determine facing direction based on the relative magnitude of vertical and horizontal distance
-				// Facing front if the vertical distance is greater than the horizontal distance
-				if (dy > Math.abs(dx))
-					animFacingIndex = Facing.FRONT;
+				if (dy > Math.abs(dx)) animFacingIndex = Facing.FRONT;
 			}
-			// If the target is positioned above the actor apply BACK facing
-			else if (Math.abs(dy) > Math.abs(dx))
+			else if (Math.abs(dy) > Math.abs(dx)) // target is above, and mostly so
 				animFacingIndex = Facing.BACK;
 		}
 
-		// If the facing is not SIDE (either to left or right)
+		// Same reasoning as in facing(): FRONT/BACK frames are only drawn one way.
 		if (animFacingIndex > Facing.SIDE)
 		{
-			// Flip image horizontally if facing is front or back
 			actor.facing = FlxDirectionFlags.RIGHT;
 			shadow.facing = FlxDirectionFlags.RIGHT;
 		}
 
-		// Ensure the shadow is always flipped vertically
-		shadow.flipY = true;
+		shadow.flipY = true; // shadow is always vertically mirrored
 	}
 
 	/**
@@ -459,15 +429,18 @@ class Actor
 	{
 		sprite.loadGraphic(asset, animated, width, height, unique);
 
-		// Iterate through the animation data using nested loops
-		for (i in 0...animNames.length)
+		for (i in 0...animNames.length) // for each facing row (SIDE, FRONT, BACK)
 		{
-			for (j in 0...animNames[i].length)
+			for (j in 0...animNames[i].length) // for each animation slot (IDLE, RUN, ATTACK, ...)
 			{
-				// Determine if the animation should loop based on the animation index
 				var isLooped:Bool = false;
 
-				// Add the animation to the sprite's animation list
+				// j == 1 and j == 6 are ANIM_RUN and ANIM_CHARGE (see the constants above) -
+				// these are the only two animations that loop continuously while the actor
+				// keeps running/charging. Every other animation (idle, attack, death, dead)
+				// plays once and holds/finishes. Written as literal 1/6 rather than
+				// `j == ANIM_RUN || j == ANIM_CHARGE` - functionally identical, but the
+				// named form would self-document this without needing this comment.
 				if (j == 1 || j == 6) isLooped = true;
 				sprite.animation.add(animNames[i][j], animData[i][j], animFrameRate[i][j], isLooped);
 			}

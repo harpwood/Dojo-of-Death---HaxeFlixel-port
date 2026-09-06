@@ -19,7 +19,14 @@ import game.GameState;
 import game.util.Color;
 
 /**
- * Class representing the credits and the disclaimer texts.
+ * The title screen: game title, "click to start" prompt, attribution text,
+ * and the Flash-EOL disclaimer. Shown during State.INTRO (see
+ * GameState.setState()) and hidden otherwise.
+ *
+ * Layout pattern used repeatedly below: call `.screenCenter()` (centers both
+ * x and y on screen), then nudge `.y` by a fixed offset. Stacking several
+ * differently-offset, screen-centered elements this way keeps everything
+ * horizontally centered while stacking them vertically without overlap.
  */
 class Credits
 {

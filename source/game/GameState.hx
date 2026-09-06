@@ -41,8 +41,10 @@ import openfl.filters.BlurFilter;
 import openfl.filters.ColorMatrixFilter;
 
 /**
- * The main FlxState of the game.
- * It handles and connects all the elements and features of the game.
+ * The main FlxState of the game: the central hub that owns and wires together
+ * every other subsystem (player, ninjas, background, pooled FX/projectiles,
+ * UI, cameras, scoring). Most other classes reach each other only through a
+ * `game:GameState` reference passed in at construction.
  */
 class GameState extends FlxState
 {
@@ -111,6 +113,11 @@ class GameState extends FlxState
 	* - State.PLAY: 		Represents the game play state of the game.
 	* - State.GAME_OVER: 	Represents the game over state of the game.
 	* - `State.RESET`: 		Represents the state of the game when resetting its elements in preparation for a new play session.
+	*
+	* Note: these "game states" are one of THREE unrelated families of state
+	* constants that happen to share integer values (see the warning in
+	* `State.hx`) - don't confuse this field with `Actor.state` (RUN/CHARGE/...)
+	* or `StrikeLine.state` (GROW/SHRINK), which are separate concepts.
 	*/
 	var state: Int;
 
@@ -124,7 +131,7 @@ class GameState extends FlxState
 	{
 		super.create();
 
-		// Instanciate the bg, pooling groups and rest of ui and game elements
+		// Instantiate the bg, pooling groups and rest of ui and game elements
 		ui 				= new UserInput(this);
 		bg 				= new Background(this);
 		ninjas 			= new Array<Ninja>();
@@ -146,7 +153,13 @@ class GameState extends FlxState
 		// Initialize the cameras
 		initCamera();
 
-		// target camera to game elements
+		// `FlxG.cameras.setDefaultDrawTarget()` sets which camera newly-`add()`ed
+		// objects are drawn to BY DEFAULT - it's global, mutable state, not tied
+		// to the objects themselves. The pattern below is: point the default at
+		// gCamera, add() all the gameplay-layer groups (so they land on
+		// gCamera), then flip the default to uiCamera and add() the UI-layer
+		// objects, then flip back to gCamera as the steady-state default for
+		// the rest of the game's lifetime (e.g. anything added later).
 		FlxG.cameras.setDefaultDrawTarget(gCamera, true);
 		FlxG.cameras.setDefaultDrawTarget(uiCamera, false);
 
@@ -176,7 +189,7 @@ class GameState extends FlxState
 		add(gameOverLayer);
 		add(creditsLayer);
 
-		// target camera to game elements
+		// target camera to game elements (steady-state default from here on)
 		FlxG.cameras.setDefaultDrawTarget(gCamera, true);
 		FlxG.cameras.setDefaultDrawTarget(uiCamera, false);
 
@@ -196,7 +209,7 @@ class GameState extends FlxState
 	 */
 
 	/**
-	 * Intialize the game and the credits
+	 * Initialize the game and the credits
 	 */
 	function start():Void
 	{
@@ -235,7 +248,7 @@ class GameState extends FlxState
 			var ninja:Ninja = ninjas[i];
 			ninja.deInitialize();
 			ninjas.remove(ninja);
-			ninja = null;
+			ninja = null; // no-op: `ninja` is a local that goes out of scope next iteration anyway; Haxe doesn't need this for cleanup. Same harmless pattern appears again in updatePlayState() below.
 		}
 
 		// Clean the background from the "stamped" corpses
@@ -261,12 +274,16 @@ class GameState extends FlxState
 	/**
 	 * Updates the game state.
 	 *
+	 * Note: case labels are raw ints matching State.* (see State.hx), same as
+	 * the switches in Player/Ninja. There's no case for State.INTRO (0):
+	 * nothing needs per-frame updating on the title screen besides `ui.update()`
+	 * above - the "click to start" transition is handled separately by
+	 * UserInput's mouse listener, not through this per-frame switch.
+	 *
 	 * @param elapsed The time elapsed since the last update, in seconds.
 	 */
-
 	override public function update(elapsed:Float):Void
 	{
-
 		super.update(elapsed);
 
 		// Update the user input
@@ -314,7 +331,15 @@ class GameState extends FlxState
 
 	/**
 	* Sets the state to the specified State value.
-	* Handles the logic betwwen state transitions.
+	* Handles the logic between state transitions.
+	*
+	* Note: entering PLAY behaves differently depending on where you're coming
+	* from. From INTRO, everything is already freshly set up by create()/start()
+	* - only the credits need to be hidden. From GAME_OVER (restarting after a
+	* death), the previous round's leftovers (dead ninjas, stamped corpses,
+	* score) are still around and must be cleared first via reset()+initialize().
+	* The only caller of setState(State.INTRO) is GameOver's 30-second
+	* auto-reset timer (see GameOver.update()).
 	*
 	* @param state The new state to set.
 	*/
@@ -367,7 +392,12 @@ class GameState extends FlxState
 		// Update the player logic
 		player.update(elapsed);
 
-		// Create an array to store ninjas that need to be removed
+		// Two-pass removal: collect dead ninjas here first rather than calling
+		// ninjas.remove() while iterating the array above. Removing elements
+		// mid-loop would shift every later index down by one, causing this
+		// loop (which walks a fixed 0...ninjas.length range) to skip the
+		// element that slides into the just-vacated slot. Doing all the
+		// removals in a separate pass afterward avoids that.
 		var ninjasToRemove:Array<Ninja> = [];
 
 		for (i in 0...ninjas.length)
@@ -386,7 +416,7 @@ class GameState extends FlxState
 			var i:Int = ninjas.indexOf(ninjasToRemove[j]);
 			var ninja:Ninja = ninjas[i];
 			ninjas.remove(ninja);
-			ninja = null;
+			ninja = null; // no-op, see the same pattern in reset() above
 		}
 
 		// Update the cursor that shows the player's direction
@@ -431,6 +461,13 @@ class GameState extends FlxState
 	/**
 	* Spawns enemies at regular intervals based on elapsed time.
 	* The enemy spawning is controlled by the spawnTimer and maxNinjas variables.
+	*
+	* Note: `spawnLength` (adjusted by checkDifficulty() below) can go negative
+	* at high difficulty (floor of -0.5 once kills reach 200). Since
+	* `Math.random()` only adds up to 1, a very negative spawnLength can make
+	* the new spawnTimer land at or below zero immediately, so at max
+	* difficulty ninjas spawn almost every frame - the only thing still
+	* limiting them at that point is the `maxNinjas` cap just below.
 	*
 	* @param elapsed The elapsed time since the last update.
 	*/
@@ -482,7 +519,9 @@ class GameState extends FlxState
 	*/
 	function addNinja():Void
 	{
-		// Randomly determine the type of ninja (Type.SWORD(=0) or Type.BOW(=1))
+		// Randomly determine the type of ninja (Type.SWORD(=0) or Type.BOW(=1)).
+		// Written as raw 0/1 here rather than Type.SWORD/Type.BOW - same
+		// values, just bypassing the named constants.
 		var type = Math.random() > 0.2 ? 0 : 1;
 
 		// Create a new instance of the Ninja class
@@ -498,6 +537,11 @@ class GameState extends FlxState
 	/**
 	* Adjusts the game difficulty based on the player's kills.
 	* Modifies the maximum number of ninjas and spawn length.
+	*
+	* Concrete milestones: `maxNinjas` gains +1 every 10 kills (starts at 5).
+	* `spawnLength` shrinks toward its floor of -0.5, reaching that floor
+	* exactly at 200 kills and staying there beyond it (see spawnEnemies()
+	* above for what a negative spawnLength does).
 	*/
 	public function checkDifficulty():Void
 	{
@@ -519,12 +563,24 @@ class GameState extends FlxState
 	/**
 	* Adds a blood effect at the specified coordinates.
 	*
+	* Pooling pattern used by every addXxx() function below: ask the pool
+	* group to `recycle()` a currently-inactive member (Flixel picks one for
+	* you), or create a brand new one if the pool has none free yet. The
+	* `if (x.isActive) addXxx(...)` retry guards against the rare case where
+	* `recycle()` had to hand back something still in use (pool momentarily
+	* exhausted) - it just tries again, since a freshly-`new`'d instance is
+	* never itself already active (its constructor always calls
+	* `deInitialize()` - see e.g. Blood.hx's constructor).
+	*
 	* @param X The x-coordinate of the blood effect.
 	* @param Y The y-coordinate of the blood effect.
 	*/
 	public function addBlood(X:Float, Y:Float):Void
 	{
-		// Randomly skip adding blood based on probability
+		// Skip 3 out of 4 requests - addBlood() is called every frame during a
+		// ninja's death animation (see Ninja.updateDeathState()), so spawning
+		// a full blood particle every single frame would be far too dense;
+		// this throttles the visible rate down to roughly 1 in 4 frames.
 		if (Math.random() < 0.25) return;
 
 		// Recycle a blood instance from the bloods pool
@@ -542,6 +598,7 @@ class GameState extends FlxState
 
 	/**
 	* Adds an arrow at the specified angle and coordinates.
+	* Same recycle-or-create(-then-retry) pooling pattern as addBlood() above.
 	*
 	* @param angle The angle of the arrow.
 	* @param X The x-coordinate of the arrow.
@@ -564,6 +621,7 @@ class GameState extends FlxState
 
 	/**
 	* Adds a broken arrow effect at the specified direction and coordinates.
+	* Same recycle-or-create(-then-retry) pooling pattern as addBlood() above.
 	*
 	* @param direction The direction of the broken arrow effect. It should be either Direction.LEFT or Direction.RIGHT.
 	* @param X The x-coordinate of the broken arrow effect.
@@ -586,6 +644,7 @@ class GameState extends FlxState
 
 	/**
 	* Adds a smoke effect at the specified coordinates.
+	* Same recycle-or-create(-then-retry) pooling pattern as addBlood() above.
 	*
 	* @param X The x-coordinate of the smoke effect.
 	* @param Y The y-coordinate of the smoke effect.
@@ -607,6 +666,7 @@ class GameState extends FlxState
 
 	/**
 	* Adds a strike line effect at the specified coordinates.
+	* Same recycle-or-create(-then-retry) pooling pattern as addBlood() above.
 	*
 	* @param X The x-coordinate of the strike line effect.
 	* @param Y The y-coordinate of the strike line effect.
@@ -733,8 +793,12 @@ class GameState extends FlxState
 			return;
 		}
 
-		// Shake effect on multiplier text based on the current multiplier
-		// Bigger multiplier = stronger shake
+		// Shake effect on multiplier text based on the current multiplier.
+		// `Math.random() * multiplier` ranges 0..multiplier; subtracting
+		// `multiplier * 0.5` re-centers that range to -multiplier/2..+multiplier/2,
+		// so the text jitters evenly around its anchor (650, 460) rather than
+		// drifting to one side - the `- multiplier * 0.5` is intentional
+		// centering, not a stray extra term.
 		multiplierText.x = 650 + Math.random() * multiplier - multiplier * 0.5;
 		multiplierText.y = 460 + Math.random() * multiplier - multiplier * 0.5;
 	}
@@ -807,6 +871,14 @@ class GameState extends FlxState
 	/**
 	* Applies camera effects by tweening the values of dV, iV, and bF.
 	* The effects include changes saturation and blur.
+	*
+	* `FlxTween.tween(this, {dV: 0.5}, 1)` mutates `this.dV` directly, every
+	* frame, over 1 second, via reflection - it doesn't know or care that dV
+	* feeds into a ColorMatrixFilter. Tweening the field alone doesn't update
+	* the filter that was built from its old value; that's why
+	* `updateGameOverState()` calls `updateCamera()` (below) every frame while
+	* these tweens are running, to rebuild the grayscale/blur filters from
+	* whatever dV/iV/bF currently are mid-tween.
 	*/
 	function applyCameraFX():Void
 	{
@@ -821,8 +893,9 @@ class GameState extends FlxState
 	}
 
 	/**
-	* Updates the camera's filters, including the grayscale and blur filters,
-	* based on the current values of dV, iV, and bF.
+	* Rebuilds the grayscale and blur filter objects from the current dV/iV/bF
+	* field values (see applyCameraFX() above for why this rebuild is needed
+	* every frame rather than happening automatically).
 	*/
 	function updateCamera():Void
 	{

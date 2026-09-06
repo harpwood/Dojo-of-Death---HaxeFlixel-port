@@ -23,18 +23,37 @@ import openfl.filters.ColorMatrixFilter;
 import openfl.geom.Point;
 
 /**
- * Represents the player character in the game
+ * The player character: the only actor controlled by mouse input rather than AI.
+ * Movement chases the mouse cursor, and attacking performs a fast "thrust" lunge
+ * toward the cursor with a visual trail line (see `line`/`thrustPoint`/`lastActorX`
+ * below for how that trail and its hit-detection work together).
  */
 class Player extends Actor
 {
 
-	var mouse:FlxPoint; 		// The position of the mouse in the game world
-	var thrustPoint:FlxPoint; 	// The point used for thrust calculations during attack
-	var line:Line;				// The line used for visual effects when the player is thrusting
+	var mouse:FlxPoint; 		// Mouse position in the game world; the player always moves toward this
+	var thrustPoint:FlxPoint; 	// The leading edge of the attack lunge trail (see block comment below)
+	var line:Line;				// Draws the visual trail from lastActorX/Y to thrustPoint during an attack
 
 	/**
-	* The previous X and Y position of the player character at the start of an attack.
-	* The line will be drawn from (lastActorX, lastActorY) to (actor.x, actor.y) while the player is attacking.
+	* How the thrust attack's three moving parts work together (see `attack()`,
+	* `updateThrust()` below):
+	*
+	* - `lastActorX/Y`: fixed anchor point, set once when the attack starts
+	*   (where the lunge began).
+	* - `thrustPoint`: the sweep's current leading edge. Each frame in
+	*   `updateThrust()`, it advances step by step from its previous position
+	*   toward the actor's new (fast-moving) position.
+	* - `actor.x/y`: the actual sprite position, which can jump forward a lot in
+	*   a single frame since `attackSpeed` is very high (a "lunge").
+	*
+	* Advancing thrustPoint in small steps (rather than jumping straight to
+	* actor.x/y) serves two purposes at once: it gives `line` something to draw
+	* a continuous trail through, AND it lets `checkForKills()` sample multiple
+	* points along the lunge path per frame, so a ninja standing between last
+	* frame's position and this frame's position still gets hit (a "swept"
+	* hit-check) instead of being skipped over because the lunge moved too fast
+	* for a single point-to-point distance check to catch it.
 	*/
 	var lastActorX:Float;
 	var lastActorY:Float;
@@ -51,19 +70,24 @@ class Player extends Actor
 	{
 		super(game);
 
-		this.game = game;
+		this.game = game; // Redundant: Actor's constructor (just called via super()) already sets this.game.
 
 		// Prepare the sprite and animations for "baking"
 		var asset:String = "assets/images/white-ninja.png"; // The player asset
 
-		// Animation data for different directions
+		// Frame indices per facing row, in ANIM_* order (IDLE, RUN, ATTACK, DEATH,
+		// DEAD01, DEAD02, CHARGE - see Actor.hx's ANIM_* constants). Note the last
+		// column (CHARGE) is just a placeholder pointing at the idle frame [0]:
+		// Player never actually enters State.CHARGE (see update() below, which
+		// throws if it ever does), but bakeAnimations() expects every row to have
+		// an entry for every slot, so this exists purely to keep the array shape valid.
 		var animData:Array<Array<Array<Int>>> = [
 			[[0], 	[1, 2, 3, 4], 		[5], 	[6, 7], 	[24],	[25], 	[0]], //  side animation frames
 			[[8], 	[9, 10, 11, 12], 	[13], 	[14, 15], 	[24],	[25],	[0]], // front animation frames
 			[[16], 	[17, 18, 19, 20], 	[21], 	[22, 23], 	[24],	[25],	[0]]  //  back animation frames
 		];
 
-		// Animation frame rate data for different directions
+		// Frames-per-second for each of the same slots above.
 		var animFrameRate:Array<Array<Int>>	= [
 			[1, 5, 1, 1, 1, 1, 1], 	//  side animation frame rates
 			[1, 5, 1, 1, 1, 1, 1], 	// front animation frame rates
@@ -183,6 +207,10 @@ class Player extends Actor
 	/**
 	* Updates the player character's state and behavior.
 	*
+	* Note: the case labels below are raw ints rather than `State.RUN` etc.
+	* They're the same values (see `State.hx`) - written as literals here just
+	* for switch-case brevity, with the state name given in each case's comment.
+	*
 	* @param elapsed The time elapsed since the last update.
 	*/
 	override public function update(elapsed:Float):Void
@@ -198,6 +226,8 @@ class Player extends Actor
 				updateRunState(elapsed);
 
 			case 1: //CHARGE
+				// Player has no charge behavior (see class doc) - reaching this
+				// case would mean something set state = State.CHARGE by mistake.
 				throw("*** Error : Player cannot be in Charge state");
 
 			case 2: // ATTACK
@@ -210,7 +240,10 @@ class Player extends Actor
 				updateDeathState();
 
 			case 5: // DEAD
-				// Transition to game over state when the player is dead
+				// The death animation (DEATH state) has finished playing and the
+				// corpse pose is showing. This is the one place Player pushes the
+				// whole GameState into GAME_OVER; NO_STATE marks this Player
+				// instance itself as finished so this switch won't run it again.
 				game.setState(State.GAME_OVER);
 				state = State.NO_STATE;
 
@@ -221,7 +254,10 @@ class Player extends Actor
 	}
 
 	/**
-	* Initiates an attack action for the player character.
+	* Initiates an attack action for the player character: a fast lunge toward
+	* the current mouse position. Resets both `thrustPoint` and `lastActorX/Y`
+	* to the actor's current position - see the block comment on `lastActorX/Y`
+	* above for what these anchor points are used for during the lunge.
 	*/
 	public function attack():Void
 	{
@@ -257,8 +293,12 @@ class Player extends Actor
 	}
 
 	/**
-	* Handles the player being hit to death
-	* @param by (optional) The source of the hit for debugging purposes
+	* Handles the player being hit to death.
+	*
+	* @param by Optional debug label for what killed the player - currently
+	* passed as "sword" (Ninja.checkForKills, melee) or "arrow" (Arrow.update,
+	* projectile). Purely for the commented-out trace below; has no effect on
+	* gameplay.
 	*/
 	public function hit(by:String = ""):Void
 	{
@@ -297,7 +337,10 @@ class Player extends Actor
 	*/
 	function updateRunState(elapsed:Float):Void
 	{
-		// If the mouse is outside the valid area, play idle animations and exit the function
+		// If the mouse has left (or is right at the edge of) the game window, stop
+		// chasing it and just idle. Margins are asymmetric (1px near-left/top vs
+		// 5px near-right/bottom) - looks like ad-hoc tuning rather than a
+		// deliberate design choice, but kept as-is here.
 		if (mouse.x < 1 || mouse.x > FlxG.width - 5 || mouse.y < 1 || mouse.y > FlxG.height - 5)
 		{
 			actor.animation.play(animNames[animFacingIndex][ANIM_IDLE]);
@@ -311,7 +354,8 @@ class Player extends Actor
 		var distance:Float = Math.sqrt(dx * dx + dy * dy);
 		angle = Math.atan2(dy, dx);
 
-		// Apply movement if the distance between the mouse and the player is big enough
+		// Only accelerate toward the mouse once it's more than 55px away - a dead
+		// zone so the player doesn't jitter trying to stand exactly on the cursor.
 		if (distance > 55)
 		{
 			// Calculate the horizontal and vertical components of the movement vector based on the angle and speed
@@ -340,15 +384,15 @@ class Player extends Actor
 		// Determine the movement speed
 		var movementSpeed:Float = Math.sqrt(vector.x * vector.x + vector.y * vector.y);
 
+		// Small threshold (rather than > 0) avoids animation flicker between
+		// idle/run from tiny leftover velocity as friction decays it toward zero.
 		if (movementSpeed > 2)
 		{
-			// Play running animation if movement speed is greater than 2
 			actor.animation.play(animNames[animFacingIndex][ANIM_RUN]);
 			shadow.animation.play(animNames[animFacingIndex][ANIM_RUN]);
 		}
 		else
 		{
-			// Play idle animation if movement speed is less than or equal to 2
 			actor.animation.play(animNames[animFacingIndex][ANIM_IDLE]);
 			shadow.animation.play(animNames[animFacingIndex][ANIM_IDLE]);
 		}
@@ -390,7 +434,7 @@ class Player extends Actor
 		actor.animation.play(animNames[animFacingIndex][ANIM_ATTACK]);
 		shadow.animation.play(animNames[animFacingIndex][ANIM_ATTACK]);
 
-		//Updates the thust effect during player thrust and detects for killing collisions
+		// Continue the thrust sweep/hit-check (see updateThrust() below)
 		updateThrust();
 	}
 
@@ -413,7 +457,8 @@ class Player extends Actor
 		actor.x += vector.x;
 		actor.y += vector.y;
 
-		// Updates the thust effect during player thrust and detects for killing collisions
+		// Lunge still has residual velocity decaying via friction here, so keep
+		// sweeping/checking for kills until it fully stops (see updateThrust() below).
 		updateThrust();
 	}
 
@@ -459,65 +504,70 @@ class Player extends Actor
 	 */
 	
 	/**
-	* Updates the thust effect during player thrust and detects for killing collisions.
+	* Advances `thrustPoint` toward the actor's current (fast-moving) position
+	* in small 5px steps, sampling `checkForKills()` at every step along the way.
+	*
+	* Why step instead of jumping straight to actor.x/y? Because `attackSpeed`
+	* is very high, actor.x/y can move well over 5px in a single frame - a
+	* single distance check at the end could miss a ninja standing anywhere in
+	* between last frame's position and this one (the lunge would "tunnel"
+	* through them). Sampling every 5px along the path closes that gap. As a
+	* side effect, it also gives `line` a trail of points to draw through for
+	* the visual sword-slash effect (see the block comment on `lastActorX/Y`
+	* in the field declarations above).
 	*/
 	function updateThrust():Void
 	{
-		// Define the thrust speed and calculate the distance and thrust angle
-		var thrustSpeed:Int = 5;
+		var thrustSpeed:Int = 5; // step size in pixels for both the sweep and the trail
 		var dx:Float = actor.x - thrustPoint.x;
 		var dy:Float = actor.y - thrustPoint.y;
-		var distance:Float = Math.sqrt(dx * dx + dy * dy);
+		var distance:Float = Math.sqrt(dx * dx + dy * dy); // how far behind the actor thrustPoint currently is
 		angle = Math.atan2(dy, dx);
 
-		// Calculate the offset components based on the angle and thrust speed
 		var offsetX:Float = Math.cos(angle) * thrustSpeed;
 		var offsetY:Float = Math.sin(angle) * thrustSpeed;
 
-		// If the distance is less than the thrustSpeed speed, there's no need to create more thrust
+		// Already caught up (or very close) - nothing to sweep this frame.
 		if (distance < thrustSpeed) return;
 
 		var steps:Int = 0;
 		while (steps < distance)
 		{
-			// Move the thrust point along the offset
 			thrustPoint.x += offsetX;
 			thrustPoint.y += offsetY;
 
-			// Draw the effect line at the updated thrust point
+			// Redraw the trail from the fixed attack-start anchor to the new leading edge.
 			line.drawIt(lastActorX, lastActorY, thrustPoint.x, thrustPoint.y);
 
-			// Kill enemies within the thrust area
-			checkForKills();
+			checkForKills(); // hit-check at this step of the sweep
 
-			// Increment steps by the thrust speed
 			steps += thrustSpeed;
 		}
 	}
 
 	/**
-	* Checks for enemy kills within the path of the player thrust.
+	* Checks each alive ninja against the current thrustPoint (see `updateThrust()`
+	* above) and kills any within `meleeReach`.
 	*/
 	function checkForKills():Void
 	{
-		// Loop through all enemy ninjas to detect collisions
 		var index:Int = game.ninjas.length;
 		for (i in 0...index)
 		{
 			var ninja:Ninja = game.ninjas[i];
 
-			// Exclude the player sprite from collision detection to avoid self-kill
+			// Guards against comparing the player to itself, but as far as this
+			// codebase is concerned `game.ninjas` only ever holds Ninja instances
+			// (never the Player) - so this condition appears to always be true
+			// given the current architecture. Left as a defensive check.
 			if (ninja.actor != actor)
 			{
-				// Check if the ninja is alive before performing collision check
 				if (ninja.alive)
 				{
-					// Calculate the distance between the ninja and the current thrust point
 					var dx:Float = ninja.x - thrustPoint.x;
 					var dy:Float = ninja.y - thrustPoint.y;
 					var distance:Float = Math.sqrt(dx * dx + dy * dy);
 
-					// if the enemy is within the player's melee reach, kill him and update the score
 					if (distance < meleeReach)
 					{
 						ninja.hit();

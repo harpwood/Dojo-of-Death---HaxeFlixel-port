@@ -18,9 +18,16 @@ import game.GameState;
 import game.util.State;
 
 /**
- * Represents a strike effect displayed on the actor when he get hit by a melee attack.
- * It is stored in a pool and reused when needed.
- * It provides animations for the strike effect, including growth and shrinkage.
+ * A brief slash-flash effect shown when an actor is hit by a melee attack.
+ * Same pooling pattern as `Blood` (see Blood.hx's class doc).
+ *
+ * Note: this class's own `state` field (below) uses `State.GROW`/`State.SHRINK`.
+ * These are a THIRD, unrelated family of state values, distinct from both the
+ * actor states (Actor.state: RUN/CHARGE/ATTACK/...) and the game states
+ * (GameState.state: INTRO/PLAY/...) - see the big warning in `State.hx` about
+ * these three enumerations sharing overlapping integer values by coincidence.
+ * This class doesn't extend `Actor`, so its `state` field is a completely
+ * separate thing from Actor's, despite the identical field name.
  */
 class StrikeLine extends FlxSprite
 {
@@ -97,6 +104,12 @@ class StrikeLine extends FlxSprite
 	/**
 	 * Updates the strike line's animations and state.
 	 *
+	 * Grows 4x faster than it shrinks (scale +20/sec up to 1.0, then -5/sec back
+	 * down) for a quick "pop" appearance followed by a gentler fade - roughly
+	 * 0.05s to grow, 0.2s to shrink. Unlike the state-machine switches in
+	 * Player/Ninja/GameState (which use raw int case labels), this one uses the
+	 * named `State.GROW`/`State.SHRINK` constants directly.
+	 *
 	 * @param elapsed The time elapsed since the last update.
 	 */
 	override public function update(elapsed:Float):Void
@@ -107,7 +120,7 @@ class StrikeLine extends FlxSprite
 				// Increase the scale of the strike line
 				_scale += elapsed * 20;
 
-				// When it grows enough, change the scate to shrink
+				// When it grows enough, change the scale to shrink
 				if (_scale >= 1)
 				{
 					_scale = 1;

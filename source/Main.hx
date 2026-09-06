@@ -28,6 +28,9 @@ class Main extends Sprite
 	{
 		super();
 
+		// 800x600 here is the game's canvas size. GEA.hx's playable-area bounds
+		// (50/50/750/550) are hardcoded to match this exact size (see the note
+		// there) - if this size ever changes, those bounds need updating too.
 		addChild(new FlxGame(800, 600, GameState));
 	}
 }

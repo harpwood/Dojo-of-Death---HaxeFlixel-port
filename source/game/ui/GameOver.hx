@@ -18,7 +18,17 @@ import game.util.Color;
 import game.util.State;
 
 /**
- * Class representing the game over screen.
+ * The game over screen: title + kills/score/best-combo readout, shown after
+ * the player dies, with a staggered fade-in and an automatic return to the
+ * title screen after 30 seconds (see update() below).
+ *
+ * Layout note: the constructor below reuses a handful of local variables
+ * (x, y, size, color, width) as a mutable "layout cursor" - each block
+ * reassigns x/y/size before creating the next text element, rather than each
+ * block declaring its own fresh values. The initial text strings ("100",
+ * "0000000", "x321") are just placeholders for layout/testing - they're
+ * always overwritten by real numbers in initialize() (misspelled as
+ * `inititialize` below - see that method's doc) once a game actually ends.
  */
 class GameOver
 {
@@ -117,6 +127,12 @@ class GameOver
 	/**
 	* Initializes the game over screen with the specified values.
 	*
+	* Note: this method's name has a typo ("inititialize" - extra "i") baked
+	* into the public API; `GameState.setState()` calls it by this exact
+	* misspelled name. Renaming it correctly would mean updating both files
+	* together, so it's left as-is here (comment-only pass) but logged for a
+	* future cleanup.
+	*
 	* @param kills The number of kills achieved by the player.
 	* @param score The final score earned by the player.
 	* @param combo The best combo achieved by the player.
@@ -130,7 +146,11 @@ class GameOver
 		textTimer = 0;
 		resetTimer = 0;
 
-		// Apply the kills, score, and combo values to the corresponding text elements
+		// Apply the kills, score, and combo values to the corresponding text elements.
+		// Note: the line below is a duplicate (was almost certainly meant to be
+		// two different assignments) - it sets killsNum.text twice and never
+		// causes a visible problem only because both duplicate calls compute
+		// the exact same value.
 		killsNum.text = Std.string(kills);
 		killsNum.text = Std.string(kills);
 		scoreNum.text = Std.string(score);
@@ -164,6 +184,14 @@ class GameOver
 
 	/**
 	* Updates the game over screen based on the elapsed time.
+	*
+	* Staggered reveal: the title fades in continuously via alpha, while
+	* kills/score/combo each pop in (as a visibility toggle, not a fade) at
+	* fixed time thresholds - 1.25s, 1.5s, 1.75s - for a one-at-a-time reveal
+	* rather than everything appearing at once. `resetTimer` separately counts
+	* up to 30 seconds, at which point the game automatically returns to
+	* State.INTRO (see the note on `GameState.setState()` about this being its
+	* only caller).
 	*
 	* @param elapsed The elapsed time since the last update.
 	*/

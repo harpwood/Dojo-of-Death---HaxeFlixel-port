@@ -14,7 +14,19 @@ package game.util;
 import flixel.FlxG;
 
 /**
- * Utility class for managing game audio.
+ * Static, stateless wrapper around `FlxG.sound` for playing this game's
+ * sound effects and background music.
+ *
+ * Sound effect variants: several effects (appear, footstep, slash, dash) have
+ * multiple numbered variants on disk (e.g. `appear01.wav` .. `appear04.wav`)
+ * and a random one is picked each time to avoid repetition. The upper bound
+ * in `Math.random() * N` MUST match how many numbered files actually exist -
+ * if you add/remove a variant file, update that N too, or you'll either never
+ * pick the new file or try to play a file that doesn't exist.
+ *
+ * Every playXxx() function starts with `if (!isSoundOn) return;` as a manual
+ * mute switch - there's no shared helper for this, it's just repeated at the
+ * top of each function below.
  */
 class Audio
 {
@@ -25,7 +37,7 @@ class Audio
 	static inline final wav:String = ".wav";
 	
 	/**
-	 * Plays the sound effect for an appearance.
+	 * Plays a random "actor appeared" sound (4 variants: appear01-04.wav).
 	 */
 	public static function playAppear():Void
 	{
@@ -36,7 +48,8 @@ class Audio
 	}
 	
 	/**
-	 * Plays the sound effect for a footstep.
+	 * Plays a random footstep sound (4 variants: footstep01-04.wav), quieter
+	 * than other effects (fixed volume 0.5) since it repeats often.
 	 */
 	public static function playFootStep():Void
 	{
@@ -47,7 +60,7 @@ class Audio
 	}
 	
 	/**
-	 * Plays the sound effect for a slash.
+	 * Plays a random melee slash sound (3 variants: slash01-03.wav).
 	 */
 	public static function playSlash():Void
 	{
@@ -58,7 +71,7 @@ class Audio
 	}
 	
 	/**
-	 * Plays the sound effect for a dash.
+	 * Plays a random dash/lunge sound (2 variants: dash01-02.wav).
 	 */
 	public static function playDash():Void
 	{
@@ -69,7 +82,8 @@ class Audio
 	}
 	
 	/**
-	 * Plays the sound effect for a bow hit.
+	 * Plays the sound for an arrow hitting/being blocked (single fixed file,
+	 * no numbered variants).
 	 */
 	public static function playBowHit():Void
 	{
@@ -79,7 +93,7 @@ class Audio
 	}
 	
 	/**
-	 * Plays the sound effect for a bow pull.
+	 * Plays the sound for a bow ninja drawing/charging its bow.
 	 */
 	public static function playBowPull():Void
 	{
@@ -89,7 +103,7 @@ class Audio
 	}
 	
 	/**
-	 * Plays the sound effect for a bow fire.
+	 * Plays the sound for a bow ninja releasing an arrow.
 	 */
 	public static function playBowFire():Void
 	{
@@ -99,7 +113,7 @@ class Audio
 	}
 	
 	/**
-	 * Plays the sound effect for a death.
+	 * Plays the player death sound.
 	 */
 	public static function playDeath():Void
 	{
@@ -109,8 +123,13 @@ class Audio
 	}
 	
 	/**
-	 * Plays the game's background music.
-	 * If the music is already playing, it won't restart.
+	 * Starts the background music, unless it's muted (`isMusicOn == false`)
+	 * or already playing. Called every time gameplay starts/restarts
+	 * (see `GameState.setState`, PLAY case).
+	 *
+	 * Note: if `isMusicOn` is false the first time this runs, `FlxG.sound.music`
+	 * is simply never assigned (stays null) - see the warning on
+	 * `isMusicPlaying()` below for why that matters.
 	 */
 	public static function playMusic():Void
 	{
@@ -121,7 +140,9 @@ class Audio
 	}
 	
 	/**
-	 * Stops the game's background music.
+	 * Stops the background music completely and clears `FlxG.sound.music`
+	 * back to null (as opposed to `pauseMusic()`, which keeps the Sound
+	 * object alive so it can be resumed). Called on player death.
 	 */
 	public static function stopMusic():Void
 	{
@@ -131,7 +152,8 @@ class Audio
 	}
 	
 	/**
-	 * Pauses the game's background music.
+	 * Pauses the background music in place (keeps `FlxG.sound.music` alive,
+	 * unlike `stopMusic()`), so `resumeMusic()` can continue it later.
 	 */
 	public static function pauseMusic():Void
 	{
@@ -140,7 +162,12 @@ class Audio
 	}
 	
 	/**
-	 * Resumes the game's background music.
+	 * Resumes previously-paused background music.
+	 *
+	 * Caution: does not null-check `FlxG.sound.music` before calling
+	 * `.resume()` on it. Only safe to call if music has actually been
+	 * started at least once via `playMusic()` (see the note there and on
+	 * `isMusicPlaying()` below).
 	 */
 	public static function resumeMusic():Void
 	{
@@ -151,6 +178,14 @@ class Audio
 	
 	/**
 	 * Checks if the game's background music is currently playing.
+	 *
+	 * Caution: does not null-check `FlxG.sound.music`. This will throw if
+	 * called before music has ever been started - which can genuinely happen:
+	 * if the player disables music (`isMusicOn = false`) before ever starting
+	 * gameplay, `playMusic()`'s early-return means `FlxG.sound.music` stays
+	 * null. Re-enabling music via the 'M' key during play
+	 * (see `UserInput.update()`) calls this function first, which would then
+	 * crash on the null `.playing` access. Not fixed here - only documented.
 	 *
 	 * @return True if the music is playing, false otherwise.
 	 */

@@ -22,6 +22,12 @@ import game.GameState;
  * background image for performance reasons using the `stamp()` method.
  * When starting a new game, the background image is refreshed
  * without the "stamped" corpses to provide a clean slate.
+ *
+ * Note: `stamp()` isn't defined anywhere in this class - it's inherited from
+ * Flixel's `FlxSprite` (draws another sprite's pixels directly onto this
+ * sprite's own bitmap). The actual stamping calls live in
+ * `Ninja.killActor()`, which stamps both the dead ninja and its shadow onto
+ * `game.bg` (this class) before destroying the live sprites.
  */
 class Background extends FlxSprite
 {
@@ -45,6 +51,15 @@ class Background extends FlxSprite
 
 	/**
 	 * Creates the graphic for the background by loading an image file.
+	 *
+	 * Note: Flixel's `loadGraphic()` source (checked versions 4.0 through
+	 * 6.2, including the exact version this project builds against) always
+	 * lists the third parameter as `frameWidth:Int`, not `Bool`. Passing the
+	 * literal `true` here still compiles and runs correctly in practice, so
+	 * whatever Haxe does with a Bool literal in an Int slot here is a real,
+	 * working language behavior, not a bug - this note is just here so a
+	 * future reader who notices the same apparent mismatch doesn't need to
+	 * re-investigate it.
 	 */
 	function createGraphic():Void
 	{
@@ -54,6 +69,12 @@ class Background extends FlxSprite
 	/**
 	* Removes the current background graphic and recreates it.
 	* Useful for refreshing the background in order to remove any "stamped" ninja corpses.
+	*
+	* Why this works: `stamp()` (see class doc above) mutates this sprite's
+	* bitmap directly - there's no list of "stamped corpses" to remove
+	* individually, just pixels baked into one image. Discarding the whole
+	* bitmap (`graphic = null`) and reloading the original file from disk via
+	* `createGraphic()` is the only way to undo all of them at once.
 	*/
 	public function removeCorpses():Void
 	{

@@ -21,17 +21,29 @@ import openfl.filters.ColorMatrixFilter;
 import openfl.geom.Point;
 
 /**
- * The Ninja class represents the enemy ninjas in the game.
+ * An enemy ninja: AI-controlled (as opposed to Player, which follows the mouse).
+ * Comes in two variants selected by `type` (see Type.SWORD / Type.BOW below):
+ * sword ninjas close to melee range and lunge; bow ninjas keep their distance
+ * and fire arrows. Both share the same state machine (RUN, CHARGE, ATTACK,
+ * COOLDOWN, DEATH, DEAD), unlike Player, which never uses CHARGE.
  */
 class Ninja extends Actor
 {
-	// The sword ninja and bow ninja assets
+	// asset/animData/animFrameRate/spriteWidth/spriteHeight below are all parallel
+	// arrays indexed by `type` (Type.SWORD = 0, Type.BOW = 1 - see Type.hx). Keep
+	// their entries in that same order if you ever add a third ninja variant.
 	var asset:Array<String> = [
 								  "assets/images/black-ninja-sword.png",
 								  "assets/images/black-ninja-bow.png"
 							  ];
 
-	// Animation data for different directions
+	// Animation data for different directions.
+	// Note: the Sword and Bow sub-arrays below are byte-for-byte identical (same
+	// frame indices, same order) even though they're written out twice. That's
+	// not a mistake to "fix" by itself - it just means both ninja spritesheets
+	// happen to be laid out with matching frame positions, so the same
+	// animData/animFrameRate values work for both, despite having different
+	// source images and sprite dimensions (see spriteWidth/spriteHeight below).
 	var animData:Array<Array<Array<Array<Int>>>> = [
 				[
 					// Sword Ninja animation frames
@@ -74,6 +86,12 @@ class Ninja extends Actor
 	* Possible values:
 	*   - Type.SWORD: Sword Ninja
 	*   - Type.BOW: Bow Ninja
+	*
+	* Note: `Type` here refers to `game.util.Type` (imported above), NOT Haxe's own
+	* built-in `Type` class (the reflection one, usable without import in any file).
+	* The explicit `import game.util.Type;` at the top of this file shadows the
+	* built-in one for the rest of Ninja.hx - if this file ever needs Haxe's
+	* reflection `Type`, it can't be referred to by its plain name here.
 	*/
 	var type: Int;
 
@@ -83,11 +101,13 @@ class Ninja extends Actor
 	// The duration of the ninja's charging
 	var chargeLength: Float;
 
-	// The melee distance for the ninja to be able to start charging to attack
-	var meleeRange: Int;
+	// AI engage distances (how close the player must get before this ninja starts
+	// charging an attack) - NOT the same as Actor's `meleeReach`, which is the
+	// actual hit-detection radius used once attacking. See meleeReach's field doc
+	// in Actor.hx for the full distinction.
+	var meleeRange: Int;	// engage distance for Sword ninjas
 
-	// The ranged distance for the ninja to be able to start charging to attack
-	var rangedRange: Int;
+	var rangedRange: Int;	// engage distance for Bow ninjas
 
 	/**
 	* Creates a new instance of an enemy ninja.
@@ -97,7 +117,7 @@ class Ninja extends Actor
 	public function new(game:GameState):Void
 	{
 		super(game);
-		this.game = game;
+		this.game = game; // Redundant: Actor's constructor (just called via super()) already sets this.game.
 
 		// Add the ninja's sprite and shadow to their corresponding groups in the parent game instance
 		game.actors.add(actor);
@@ -133,7 +153,12 @@ class Ninja extends Actor
 		// "bake" the ninja animations
 		bakeNinja(type);
 
-		// Set initial values for movement and attack parameters
+		// Set initial values for movement and attack parameters.
+		// Three different "distance" concepts get set here - see the field docs
+		// above/in Actor.hx if the names are confusing:
+		//   meleeReach  = 20  -> hit-detection radius (overrides Actor's default of 30)
+		//   meleeRange  = 100 -> Sword ninja's AI engage distance
+		//   rangedRange = 300 -> Bow ninja's AI engage distance
 		speed = 50;
 		meleeReach = 20;
 		meleeRange = 100;
@@ -202,6 +227,12 @@ class Ninja extends Actor
 	/**
 	* Updates the ninja's state and behavior.
 	*
+	* Note: case labels below are raw ints matching the State.* constants
+	* (see State.hx) - written as literals here for brevity, named in each
+	* case's comment. Unlike Player, DEAD here calls `killActor()` (stamps the
+	* corpse onto the background and removes this ninja) rather than ending
+	* the game.
+	*
 	* @param elapsed The time elapsed since the last update.
 	*/
 	override public function update(elapsed:Float):Void
@@ -234,11 +265,11 @@ class Ninja extends Actor
 	}
 
 	/**
-	* Handles the ninja being hit to death
+	* Handles the ninja being hit to death.
 	*/
 	public function hit():Void
 	{
-		// update player's state and alive flag
+		// update the ninja's state and alive flag
 		state = State.DEATH;
 		alive = false;
 
@@ -334,22 +365,29 @@ class Ninja extends Actor
 		// Determine the movement speed
 		var movementSpeed:Float = Math.sqrt(vector.x * vector.x + vector.y * vector.y);
 
+		// Small threshold (same reasoning as Player.updateRunState) avoids
+		// idle/run animation flicker from tiny leftover velocity.
 		if (movementSpeed > 2)
 		{
-			// Play running animation if movement speed is greater than 2
 			actor.animation.play(animNames[animFacingIndex][ANIM_RUN]);
 			shadow.animation.play(animNames[animFacingIndex][ANIM_RUN]);
 		}
 		else
 		{
-			// Play idle animation if movement speed is less than or equal to 2
 			actor.animation.play(animNames[animFacingIndex][ANIM_IDLE]);
 			shadow.animation.play(animNames[animFacingIndex][ANIM_IDLE]);
 		}
 	}
 
 	/**
-	* Updates the ninja during the CHARGE state.
+	* Updates the ninja during the CHARGE state. Neither ninja type moves
+	* during charge, but Bow ninjas continuously re-aim toward the player
+	* (via facingRanged() below) in case the player moves before the shot
+	* fires; Sword ninjas only set their facing once, when the charge starts
+	* (see chargeMeleeAttack()). This only affects which way the ninja LOOKS
+	* while charging - the actual lunge/arrow direction in attack()/shoot()
+	* below is always recalculated fresh from the player's position at the
+	* moment the charge finishes, for both types.
 	*
 	* @param elapsed The elapsed time since the last update.
 	*/
@@ -537,12 +575,18 @@ class Ninja extends Actor
 		actor.animation.play(animNames[animFacingIndex][ANIM_ATTACK]);
 		shadow.animation.play(animNames[animFacingIndex][ANIM_ATTACK]);
 
-		// Play the apropriate sound
+		// Play the appropriate sound
 		Audio.playBowFire();
 	}
 
 	/**
-	* Checks if nijna kills the player within his attack path.
+	* Checks if this ninja kills the player within its attack path.
+	*
+	* Only ever called from `updateAttackState()` below, which only Sword
+	* ninjas reach (Bow ninjas shortcut from CHARGE straight to COOLDOWN via
+	* `shoot()`, without ever setting state = State.ATTACK) - hence the
+	* hardcoded "sword" debug label below is always accurate here, not an
+	* assumption.
 	*/
 	function checkForKills():Void
 	{
@@ -565,11 +609,15 @@ class Ninja extends Actor
 	}
 
 	/**
-	 * Clean ups the ninja's actor and shadow sprites after he got killed
+	 * Cleans up the ninja's actor and shadow sprites after it got killed.
 	 */
 	function killActor():Void
 	{
-		// For perfomance optimization "stamp" the dead body and the shadow on the background image
+		// For performance, "stamp" the dead body and its shadow onto the
+		// background image (a static bitmap) instead of keeping them as live
+		// sprites - see Background.hx for why. Offsets (-36/-28 and -36/+8)
+		// undo this sprite's own offset/anchor so the stamp lands in the right
+		// screen position.
 		game.bg.stamp(actor, Std.int(actor.x) - 36, Std.int(actor.y) - 28);
 		game.bg.stamp(shadow, Std.int(shadow.x) - 36, Std.int(shadow.y) + 8);
 
@@ -587,7 +635,7 @@ class Ninja extends Actor
 		bakeAnimations(actor, asset[type], true, spriteWidth[type], spriteHeight[type], false, animData[type], animFrameRate[type]);
 		actor.offset.set(36, 28);
 
-		// "bake" the player's shadow, adjust its offset
+		// "bake" the ninja's shadow, adjust its offset
 		bakeAnimations(shadow, asset[type], true, spriteWidth[type], spriteHeight[type], true, animData[type], animFrameRate[type]);
 		shadow.offset.set(36, -8);
 

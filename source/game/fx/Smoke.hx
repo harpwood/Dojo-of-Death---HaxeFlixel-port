@@ -17,16 +17,15 @@ import game.GameState;
 import game.util.Color;
 
 /**
- * Represents a smoke sprite that is used for visual effects in the game.
- * It is stored in a pool available to be reused.
- * The smoke sprite is created when a new actor appears, triggering a smoke effect.
- * It provides movement and fading animations for the smoke effect.
+ * A single smoke puff particle, shown briefly when an actor (Player or Ninja)
+ * appears. Follows the same pool-of-pre-built-instances pattern as `Blood` -
+ * see the class doc on `Blood.hx` for how that pooling works in general.
  */
 class Smoke extends FlxSprite
 {
 	var game:GameState; // The parent FlxState instance reference
-	var dx:Float;		// The horizontal movement speed of the smoke sprite
-	var dy:Float;		// The vertical movement speed of the smoke sprite
+	var dx:Float;		// Horizontal drift speed - always positive (see initialize()), so every puff drifts the same direction, unlike Blood's symmetric left/right drift
+	var dy:Float;		// Vertical "lift" speed - same sign convention as Blood.dy (see Blood.hx's update() doc), just tuned weaker/slower for a floating rather than arcing motion
 
 	public var isActive(default, null):Bool; // Flag indicating if the smoke sprite is currently being used
 
@@ -97,6 +96,13 @@ class Smoke extends FlxSprite
 	/**
 	 * Updates the smoke sprite's position and animations.
 	 *
+	 * Same rising/decelerating motion idea as Blood (see Blood.hx's update()
+	 * doc for the dy sign-convention explanation) - here tuned to look like a
+	 * slow-rising, decelerating puff rather than an arc, and it fades out via
+	 * `alpha` well before dy would go negative. Unlike Blood.hx, every value
+	 * here (dx, dy, alpha) is correctly multiplied by `elapsed`, so this
+	 * effect's speed and lifetime are frame-rate independent.
+	 *
 	 * @param elapsed The time elapsed since the last update.
 	 */
 	override public function update(elapsed:Float):Void
@@ -106,7 +112,7 @@ class Smoke extends FlxSprite
 		x += dx * elapsed;
 		y -= dy * elapsed;
 
-		// Fade out the smoke sprite over time
+		// Fade out the smoke sprite over time (alpha starts at 1, so this is a ~1 second lifetime)
 		alpha -= elapsed;
 
 		// Deinitialize the smoke sprite if it has completely faded out

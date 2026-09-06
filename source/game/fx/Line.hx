@@ -18,8 +18,21 @@ import flixel.util.FlxColor;
 using flixel.util.FlxSpriteUtil;
 
 /**
- * Represents a line sprite used for visual effects in the game.
- * The line sprite is used to draw a line between two points, creating a trail effect.
+ * Draws the Player's attack-trail visual: a single line segment redrawn onto
+ * a full-screen transparent canvas each time `drawIt()` is called.
+ *
+ * Unlike Blood/Smoke/StrikeLine/Arrow/ArrowBroken, this is NOT one of a pool
+ * of interchangeable instances - there's exactly one `Line`, created once by
+ * `Player`'s constructor and kept for the whole game. `initialize()`/
+ * `deInitialize()` here just toggle the `canDraw` flag (whether the trail is
+ * actively being drawn or fading out); they don't use Flixel's kill()/revive()
+ * or belong to a pool group the way the FX classes' same-named methods do.
+ *
+ * Performance note: the backing graphic is `FlxG.width` x `FlxG.height`
+ * (the full screen), and every `drawIt()` call clears and redraws that whole
+ * canvas - `Player.updateThrust()` can call this several times in a single
+ * frame during an attack. Fine at this game's scale, but worth knowing if a
+ * fast-drawn effect like this is ever reused somewhere hotter.
  */
 class Line extends FlxSprite
 {
@@ -59,7 +72,9 @@ class Line extends FlxSprite
 
 	override public function update(elapsed:Float):Void
 	{
-		// If the line cannot be drawn, fade it out gradually over time
+		// canDraw == false means the attack just ended: drawIt() has stopped
+		// being called, so the last-drawn line stays on the canvas as-is while
+		// this just fades the whole sprite's alpha down to fully transparent.
 		if (!canDraw) alpha = Math.max(alpha - elapsed, 0);
 	}
 
