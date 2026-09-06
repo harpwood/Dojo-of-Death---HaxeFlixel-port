@@ -36,6 +36,7 @@ import game.ui.UserInput;
 import game.util.Audio;
 import game.util.Color;
 import game.util.State;
+import game.util.Type;
 import openfl.filters.BitmapFilter;
 import openfl.filters.BlurFilter;
 import openfl.filters.ColorMatrixFilter;
@@ -519,10 +520,8 @@ class GameState extends FlxState
 	*/
 	function addNinja():Void
 	{
-		// Randomly determine the type of ninja (Type.SWORD(=0) or Type.BOW(=1)).
-		// Written as raw 0/1 here rather than Type.SWORD/Type.BOW - same
-		// values, just bypassing the named constants.
-		var type = Math.random() > 0.2 ? 0 : 1;
+		// Randomly determine the type of ninja (80% Sword, 20% Bow)
+		var type = Math.random() > 0.2 ? Type.SWORD : Type.BOW;
 
 		// Create a new instance of the Ninja class
 		var ninja = new Ninja(this);

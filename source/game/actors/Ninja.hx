@@ -32,7 +32,7 @@ class Ninja extends Actor
 	// asset/animData/animFrameRate/spriteWidth/spriteHeight below are all parallel
 	// arrays indexed by `type` (Type.SWORD = 0, Type.BOW = 1 - see Type.hx). Keep
 	// their entries in that same order if you ever add a third ninja variant.
-	var asset:Array<String> = [
+	static var asset:Array<String> = [
 								  "assets/images/black-ninja-sword.png",
 								  "assets/images/black-ninja-bow.png"
 							  ];
@@ -44,7 +44,7 @@ class Ninja extends Actor
 	// happen to be laid out with matching frame positions, so the same
 	// animData/animFrameRate values work for both, despite having different
 	// source images and sprite dimensions (see spriteWidth/spriteHeight below).
-	var animData:Array<Array<Array<Array<Int>>>> = [
+	static var animData:Array<Array<Array<Array<Int>>>> = [
 				[
 					// Sword Ninja animation frames
 					[[0], 	[1, 2, 3, 4], 		[7], 	[8, 9], 	[30],	[31], 	[5, 6]], 	//  side animation frames
@@ -60,7 +60,7 @@ class Ninja extends Actor
 			];
 
 	// Animation frame rate data for different directions
-	var animFrameRate:Array<Array<Array<Int>>>	= [
+	static var animFrameRate:Array<Array<Array<Int>>>	= [
 				[
 					// Sword Ninja animation frame rates
 					[1, 5, 1, 1, 1, 1, 15], 	//  side animation frame rates
@@ -76,10 +76,10 @@ class Ninja extends Actor
 			];
 
 	// Width of the sprites for each ninja type
-	var spriteWidth: Array<Int> = [91, 84];
+	static var spriteWidth: Array<Int> = [91, 84];
 
 	// Height of the sprites for each ninja type
-	var spriteHeight: Array<Int> = [64, 60];
+	static var spriteHeight: Array<Int> = [64, 60];
 
 	/**
 	* The type of the ninja.
@@ -117,7 +117,6 @@ class Ninja extends Actor
 	public function new(game:GameState):Void
 	{
 		super(game);
-		this.game = game; // Redundant: Actor's constructor (just called via super()) already sets this.game.
 
 		// Add the ninja's sprite and shadow to their corresponding groups in the parent game instance
 		game.actors.add(actor);

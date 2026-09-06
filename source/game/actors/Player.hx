@@ -70,8 +70,6 @@ class Player extends Actor
 	{
 		super(game);
 
-		this.game = game; // Redundant: Actor's constructor (just called via super()) already sets this.game.
-
 		// Prepare the sprite and animations for "baking"
 		var asset:String = "assets/images/white-ninja.png"; // The player asset
 

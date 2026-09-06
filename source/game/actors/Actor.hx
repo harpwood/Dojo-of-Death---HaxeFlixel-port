@@ -441,7 +441,7 @@ class Actor
 				// plays once and holds/finishes. Written as literal 1/6 rather than
 				// `j == ANIM_RUN || j == ANIM_CHARGE` - functionally identical, but the
 				// named form would self-document this without needing this comment.
-				if (j == 1 || j == 6) isLooped = true;
+				if (j == ANIM_RUN || j == ANIM_CHARGE) isLooped = true;
 				sprite.animation.add(animNames[i][j], animData[i][j], animFrameRate[i][j], isLooped);
 			}
 		}

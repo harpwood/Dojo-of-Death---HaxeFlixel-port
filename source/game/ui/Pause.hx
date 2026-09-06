@@ -43,9 +43,9 @@ class Pause extends FlxSubState
 	 * passed here. Passing a custom color to this constructor currently has
 	 * no effect.
 	 */
-	public function new(game:GameState, BGColor:FlxColor=FlxColor.TRANSPARENT) 
+	public function new(game:GameState, BGColor:FlxColor=Color.SEMI_TRANSP_BLACK) 
 	{
-		super(Color.SEMI_TRANSP_BLACK);
+		super(BGColor);
 		
 		this.game = game;
 		

@@ -146,12 +146,7 @@ class GameOver
 		textTimer = 0;
 		resetTimer = 0;
 
-		// Apply the kills, score, and combo values to the corresponding text elements.
-		// Note: the line below is a duplicate (was almost certainly meant to be
-		// two different assignments) - it sets killsNum.text twice and never
-		// causes a visible problem only because both duplicate calls compute
-		// the exact same value.
-		killsNum.text = Std.string(kills);
+		// Apply the kills, score, and combo values to the corresponding text elements
 		killsNum.text = Std.string(kills);
 		scoreNum.text = Std.string(score);
 		comboNum.text = "x" + Std.string(combo);
