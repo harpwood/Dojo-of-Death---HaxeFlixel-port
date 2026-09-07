@@ -31,10 +31,11 @@ import openfl.geom.Point;
 class Player extends Actor
 {
 
-	var mouse:FlxPoint; 		// Mouse position in the game world; the player always moves toward this
-	var thrustPoint:FlxPoint; 	// The leading edge of the attack lunge trail (see block comment below)
-	var line:Line;				// Draws the visual trail from lastActorX/Y to thrustPoint during an attack
-
+	var mouse:FlxPoint; 					// Mouse position in the game world; the player always moves toward this
+	var thrustPoint:FlxPoint; 				// The leading edge of the attack lunge trail (see block comment below)
+	var line:Line;							// Draws the visual trail from lastActorX/Y to thrustPoint during an attack
+	final CHASE_STOP_DISTANCE:Int = 55; 	// dead-zone radius: player stops accelerating once this close to the mouse
+	final ANIM_SWITCH_THRESHOLD:Int = 2; 	// small dead-zone (compared as squared) so idle/run animation doesn't flicker from tiny leftover velocity as friction decays it toward zero
 	/**
 	* How the thrust attack's three moving parts work together (see `attack()`,
 	* `updateThrust()` below):
@@ -349,12 +350,12 @@ class Player extends Actor
 		// Calculate the distance and the angle between player and mouse position
 		var dx:Float = mouse.x - actor.x;
 		var dy:Float = mouse.y - actor.y;
-		var distance:Float = Math.sqrt(dx * dx + dy * dy);
+		var distance:Float = dx * dx + dy * dy;
 		angle = Math.atan2(dy, dx);
 
 		// Only accelerate toward the mouse once it's more than 55px away - a dead
 		// zone so the player doesn't jitter trying to stand exactly on the cursor.
-		if (distance > 55)
+		if (distance > CHASE_STOP_DISTANCE * CHASE_STOP_DISTANCE)
 		{
 			// Calculate the horizontal and vertical components of the movement vector based on the angle and speed
 			vector.x += Math.cos(angle) * speed * elapsed;
@@ -379,12 +380,11 @@ class Player extends Actor
 
 		facing();
 
-		// Determine the movement speed
-		var movementSpeed:Float = Math.sqrt(vector.x * vector.x + vector.y * vector.y);
+		// Determine the squared movement speed
+		var movementSpeed:Float = vector.x * vector.x + vector.y * vector.y;
 
-		// Small threshold (rather than > 0) avoids animation flicker between
-		// idle/run from tiny leftover velocity as friction decays it toward zero.
-		if (movementSpeed > 2)
+		// See ANIM_SWITCH_THRESHOLD's field doc above for why this isn't just > 0.
+		if (movementSpeed > ANIM_SWITCH_THRESHOLD * ANIM_SWITCH_THRESHOLD)
 		{
 			actor.animation.play(animNames[animFacingIndex][ANIM_RUN]);
 			shadow.animation.play(animNames[animFacingIndex][ANIM_RUN]);
@@ -545,7 +545,7 @@ class Player extends Actor
 
 	/**
 	* Checks each alive ninja against the current thrustPoint (see `updateThrust()`
-	* above) and kills any within `meleeReach`.
+	* above) and kills any within `meleeHitRadius`.
 	*/
 	function checkForKills():Void
 	{
@@ -564,9 +564,9 @@ class Player extends Actor
 				{
 					var dx:Float = ninja.x - thrustPoint.x;
 					var dy:Float = ninja.y - thrustPoint.y;
-					var distance:Float = Math.sqrt(dx * dx + dy * dy);
+					var distance:Float = dx * dx + dy * dy;
 
-					if (distance < meleeReach)
+					if (distance < meleeHitRadius * meleeHitRadius)
 					{
 						ninja.hit();
 						game.addScore();

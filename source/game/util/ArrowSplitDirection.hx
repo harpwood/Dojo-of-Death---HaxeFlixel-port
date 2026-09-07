@@ -17,11 +17,13 @@ package game.util;
  * a leftward or rightward launch velocity).
  *
  * Not to be confused with `flixel.util.FlxDirectionFlags` (imported in
- * `Actor.hx`/`Ninja.hx`), which is a separate, unrelated LEFT/RIGHT enum
- * from the Flixel library used for sprite facing/flipping. Same names,
- * different classes, different purposes - don't mix them up.
+ * `Actor.hx`), a separate, unrelated LEFT/RIGHT enum from the Flixel
+ * library used for sprite facing/flipping. Different purpose entirely -
+ * this class's narrower name is meant to make that distinction obvious
+ * without needing this note, but it's kept here for anyone who still
+ * lands on this file wondering.
  */
-class Direction
+class ArrowSplitDirection
 {
 	static public inline final LEFT:Int = 0;    // Broken arrow half launches to the left.
 	static public inline final RIGHT:Int = 1;   // Broken arrow half launches to the right.

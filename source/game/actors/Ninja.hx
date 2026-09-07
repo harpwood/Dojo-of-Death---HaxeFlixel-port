@@ -11,9 +11,7 @@
 
 package game.actors;
 
-import flixel.util.FlxDirectionFlags;
 import game.GameState;
-import game.actors.Player;
 import game.util.Audio;
 import game.util.State;
 import game.util.Type;
@@ -29,6 +27,8 @@ import openfl.geom.Point;
  */
 class Ninja extends Actor
 {
+	final ANIM_SWITCH_THRESHOLD:Int = 2; 	// small dead-zone (compared as squared) so idle/run animation doesn't flicker from tiny leftover velocity as friction decays it toward zero
+
 	// asset/animData/animFrameRate/spriteWidth/spriteHeight below are all parallel
 	// arrays indexed by `type` (Type.SWORD = 0, Type.BOW = 1 - see Type.hx). Keep
 	// their entries in that same order if you ever add a third ninja variant.
@@ -102,12 +102,12 @@ class Ninja extends Actor
 	var chargeLength: Float;
 
 	// AI engage distances (how close the player must get before this ninja starts
-	// charging an attack) - NOT the same as Actor's `meleeReach`, which is the
-	// actual hit-detection radius used once attacking. See meleeReach's field doc
+	// charging an attack) - NOT the same as Actor's `meleeHitRadius`, which is the
+	// actual hit-detection radius used once attacking. See meleeHitRadius's field doc
 	// in Actor.hx for the full distinction.
-	var meleeRange: Int;	// engage distance for Sword ninjas
+	var meleeEngageRange: Int;	// engage distance for Sword ninjas
 
-	var rangedRange: Int;	// engage distance for Bow ninjas
+	var rangedEngageRange: Int;	// engage distance for Bow ninjas
 
 	/**
 	* Creates a new instance of an enemy ninja.
@@ -155,13 +155,13 @@ class Ninja extends Actor
 		// Set initial values for movement and attack parameters.
 		// Three different "distance" concepts get set here - see the field docs
 		// above/in Actor.hx if the names are confusing:
-		//   meleeReach  = 20  -> hit-detection radius (overrides Actor's default of 30)
-		//   meleeRange  = 100 -> Sword ninja's AI engage distance
-		//   rangedRange = 300 -> Bow ninja's AI engage distance
+		//   meleeHitRadius  = 20  -> hit-detection radius (overrides Actor's default of 30)
+		//   meleeEngageRange  = 100 -> Sword ninja's AI engage distance
+		//   rangedEngageRange = 300 -> Bow ninja's AI engage distance
 		speed = 50;
-		meleeReach = 20;
-		meleeRange = 100;
-		rangedRange = 300;
+		meleeHitRadius = 20;
+		meleeEngageRange = 100;
+		rangedEngageRange = 300;
 		attackSpeed = 500;
 		attackTimer = 0;
 		attackLength = 0.3;
@@ -306,6 +306,11 @@ class Ninja extends Actor
 	/**
 	* Updates the ninja's behavior during the RUN state.
 	*
+	* Note: `distance` here holds the SQUARED distance (dx*dx + dy*dy), not
+	* the actual distance - both comparisons below (meleeEngageRange, rangedEngageRange)
+	* square their threshold to match, avoiding an unnecessary sqrt() since
+	* only threshold checks are needed here, never the real distance value.
+	*
 	* @param elapsed The elapsed time since the last update.
 	*/
 	function updateRunState(elapsed:Float):Void
@@ -313,10 +318,10 @@ class Ninja extends Actor
 		// Calculate the distance between player and ninja
 		var dx:Float = game.player.x - actor.x;
 		var dy:Float = game.player.y - actor.y;
-		var distance:Float = Math.sqrt(dx * dx + dy * dy);
+		var distance:Float = dx * dx + dy * dy;
 
 		// Check if the Ninja is a Sword Ninja and if the player is within melee range
-		if (type == Type.SWORD && distance < meleeRange)
+		if (type == Type.SWORD && distance < meleeEngageRange * meleeEngageRange)
 		{
 			// If the player is alive, charge for melee attack
 			if (game.player.alive)
@@ -331,7 +336,7 @@ class Ninja extends Actor
 		}
 
 		// Check if the Ninja is a Bow Ninja and if the player is within the bow range
-		if (this.type == Type.BOW && distance < rangedRange)
+		if (this.type == Type.BOW && distance < rangedEngageRange * rangedEngageRange)
 		{
 			// If the player is alive, charge for ranged attack
 			if (game.player.alive)
@@ -361,12 +366,11 @@ class Ninja extends Actor
 
 		facing();
 
-		// Determine the movement speed
-		var movementSpeed:Float = Math.sqrt(vector.x * vector.x + vector.y * vector.y);
+		// Determine the squared movement speed
+		var movementSpeed:Float = vector.x * vector.x + vector.y * vector.y;
 
-		// Small threshold (same reasoning as Player.updateRunState) avoids
-		// idle/run animation flicker from tiny leftover velocity.
-		if (movementSpeed > 2)
+		// See ANIM_SWITCH_THRESHOLD's field doc above for why this isn't just > 0.
+		if (movementSpeed > ANIM_SWITCH_THRESHOLD * ANIM_SWITCH_THRESHOLD)
 		{
 			actor.animation.play(animNames[animFacingIndex][ANIM_RUN]);
 			shadow.animation.play(animNames[animFacingIndex][ANIM_RUN]);
@@ -592,13 +596,13 @@ class Ninja extends Actor
 		// Check for kill only if the player is alive
 		if (!game.player.alive) return;
 
-		// Calculate the distance between the ninja and the player
+		// Calculate the squared distance between the ninja and the player
 		var dx:Float = game.player.x - x;
 		var dy:Float = game.player.y - y;
-		var distance:Float = Math.sqrt(dx * dx + dy * dy);
+		var distance:Float = dx * dx + dy * dy;
 
-		// if the player is within the ninja's melee reach
-		if (distance < meleeReach)
+		// if the player is within the ninja's melee hit radius
+		if (distance < meleeHitRadius * meleeHitRadius)
 		{
 			// but if the player is attacking the ninja is killed
 			if (game.player.state == State.ATTACK) hit();

@@ -563,13 +563,17 @@ class GameState extends FlxState
 	* Adds a blood effect at the specified coordinates.
 	*
 	* Pooling pattern used by every addXxx() function below: ask the pool
-	* group to `recycle()` a currently-inactive member (Flixel picks one for
-	* you), or create a brand new one if the pool has none free yet. The
-	* `if (x.isActive) addXxx(...)` retry guards against the rare case where
-	* `recycle()` had to hand back something still in use (pool momentarily
-	* exhausted) - it just tries again, since a freshly-`new`'d instance is
-	* never itself already active (its constructor always calls
-	* `deInitialize()` - see e.g. Blood.hx's constructor).
+	* group to `recycle()` a currently-inactive member, or create a brand new
+	* one if the pool has none free yet.
+	*
+	* Guard: `if (!x.isActive) x.initialize(...)` skips spawning (does nothing)
+	* on the rare chance the returned instance is somehow still active,
+	* instead of retrying. Given how this project calls `recycle()` (no
+	* `maxSize` set on any pool) and how every pooled FX class pairs
+	* `isActive` with Flixel's own `exists` flag, this guard never actually
+	* triggers today - but unlike a retry, it can never recurse or loop even
+	* if that assumption ever stops holding (e.g. if `maxSize` is set on a
+	* pool in the future), so there's no need to revisit it later.
 	*
 	* @param X The x-coordinate of the blood effect.
 	* @param Y The y-coordinate of the blood effect.
@@ -588,16 +592,13 @@ class GameState extends FlxState
 		// If no blood instance is available in the pool, create a new one
 		if (blood == null) blood = new Blood(this);
 
-		// Check if the blood instance is already in use
-		// If in use, recursively call the function to try again
-		if (blood.isActive) addBlood(X, Y);
-		// If not in use, initialize the blood instance at the specified coordinates
-		else blood.initialize(X, Y);
+		// Initialize it, unless it's somehow already active (see doc above)
+		if (!blood.isActive) blood.initialize(X, Y);
 	}
 
 	/**
 	* Adds an arrow at the specified angle and coordinates.
-	* Same recycle-or-create(-then-retry) pooling pattern as addBlood() above.
+	* Same recycle-or-create pooling pattern as addBlood() above.
 	*
 	* @param angle The angle of the arrow.
 	* @param X The x-coordinate of the arrow.
@@ -611,18 +612,15 @@ class GameState extends FlxState
 		// If no arrow instance is available in the pool, create a new one
 		if (arrow == null) arrow = new Arrow(this);
 
-		// Check if the arrow instance is already in use
-		// If in use, recursively call the function to try again
-		if (arrow.isActive) addArrow(angle, X, Y);
-		// If not in use, initialize the arrow instance with the specified angle and coordinates
-		else arrow.initialize(angle, X, Y);
+		// Initialize it, unless it's somehow already active (see addBlood() above)
+		if (!arrow.isActive) arrow.initialize(angle, X, Y);
 	}
 
 	/**
 	* Adds a broken arrow effect at the specified direction and coordinates.
-	* Same recycle-or-create(-then-retry) pooling pattern as addBlood() above.
+	* Same recycle-or-create pooling pattern as addBlood() above.
 	*
-	* @param direction The direction of the broken arrow effect. It should be either Direction.LEFT or Direction.RIGHT.
+	* @param direction The direction of the broken arrow effect. It should be either ArrowSplitDirection.LEFT or ArrowSplitDirection.RIGHT.
 	* @param X The x-coordinate of the broken arrow effect.
 	* @param Y The y-coordinate of the broken arrow effect.
 	*/
@@ -634,16 +632,13 @@ class GameState extends FlxState
 		// If no arrowBroken instance is available in the pool, create a new one
 		if (arrowBroken == null) arrowBroken = new ArrowBroken(this);
 
-		// Check if the arrowBroken instance is already in use
-		// If in use, recursively call the function to try again
-		if (arrowBroken.isActive) addArrowBroken(direction, X, Y);
-		// If not in use, initialize the arrowBroken instance with the specified direction and coordinates
-		else arrowBroken.initialize(direction, X, Y);
+		// Initialize it, unless it's somehow already active (see addBlood() above)
+		if (!arrowBroken.isActive) arrowBroken.initialize(direction, X, Y);
 	}
 
 	/**
 	* Adds a smoke effect at the specified coordinates.
-	* Same recycle-or-create(-then-retry) pooling pattern as addBlood() above.
+	* Same recycle-or-create pooling pattern as addBlood() above.
 	*
 	* @param X The x-coordinate of the smoke effect.
 	* @param Y The y-coordinate of the smoke effect.
@@ -656,16 +651,13 @@ class GameState extends FlxState
 		// If no smoke instance is available in the pool, create a new one
 		if (smoke == null) smoke = new Smoke(this);
 
-		// Check if the smoke instance is already in use
-		// If in use, recursively call the function to try again
-		if (smoke.isActive) addSmoke(X, Y);
-		// If not in use, initialize the smoke instance at the specified coordinates
-		else smoke.initialize(X, Y);
+		// Initialize it, unless it's somehow already active (see addBlood() above)
+		if (!smoke.isActive) smoke.initialize(X, Y);
 	}
 
 	/**
 	* Adds a strike line effect at the specified coordinates.
-	* Same recycle-or-create(-then-retry) pooling pattern as addBlood() above.
+	* Same recycle-or-create pooling pattern as addBlood() above.
 	*
 	* @param X The x-coordinate of the strike line effect.
 	* @param Y The y-coordinate of the strike line effect.
@@ -678,11 +670,8 @@ class GameState extends FlxState
 		// If no strike line instance is available in the pool, create a new one
 		if (strike == null) strike = new StrikeLine(this);
 
-		// Check if the strike line instance is already in use
-		// If in use, recursively call the function to try again
-		if (strike.isActive) addStrike(X, Y);
-		// If not in use, initialize the strike line instance at the specified coordinates
-		else strike.initialize(X, Y);
+		// Initialize it, unless it's somehow already active (see addBlood() above)
+		if (!strike.isActive) strike.initialize(X, Y);
 	}
 
 	/**

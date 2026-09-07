@@ -152,8 +152,8 @@ class Actor
 	var attackLength:Float;		// The lenght of the time that must elapsed before attacking
 	var cooldownTimer:Float;	// The time that must elapse before the actor's cooldown period ends
 	var cooldownLength:Float;	// The duration of the cooldown period after an attack
-	var meleeReach:Int;			// Hit-detection radius: how close an actor's weapon must be to a target to actually land a hit (checked in Player/Ninja checkForKills()).
-									// NOT the same as Ninja's own `meleeRange`/`rangedRange` fields, which are AI engage distances
+	var meleeHitRadius:Int;			// Hit-detection radius: how close an actor's weapon must be to a target to actually land a hit (checked in Player/Ninja checkForKills()).
+									// NOT the same as Ninja's own `meleeEngageRange`/`rangedEngageRange` fields, which are AI engage distances
 									// (how close the player must get before a ninja starts charging an attack). Similar names, different purposes.
 
 	// Public instance properties specific to the Actor class (not related to actor:FlxSprite)
@@ -224,7 +224,7 @@ class Actor
 		shadow = new FlxSprite(); 	 // Create a new FlxSprite instance to represent the shadow sprite for the actor
 		vector = new FlxPoint(0, 0); // Create a new FlxPoint instance to store the vector of the actor's movement
 		friction = 0.75; 			 // Set the friction value to control the actor's movement speed reduction
-		meleeReach = 30; 			 // Default hit-detection radius (see meleeReach field doc above for how this differs from Ninja's meleeRange/rangedRange)
+		meleeHitRadius = 30; 			 // Default hit-detection radius (see meleeHitRadius field doc above for how this differs from Ninja's meleeEngageRange/rangedEngageRange)
 	}
 	
 	/**

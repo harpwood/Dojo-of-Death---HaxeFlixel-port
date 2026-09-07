@@ -15,7 +15,7 @@ import flixel.math.FlxAngle;
 import flixel.system.FlxAssets.FlxGraphicAsset;
 import game.util.Audio;
 import game.GameState;
-import game.util.Direction;
+import game.util.ArrowSplitDirection;
 import game.util.GEA;
 import game.util.State;
 
@@ -103,16 +103,16 @@ class Arrow extends FlxSprite
 		y += Math.sin(arrowAngle) * arrowSpeed * elapsed;
 
 		// Check collision with the player and if the player is alive.
-		// Note: `distance` is assigned INSIDE the if-condition here (Haxe
-		// assignment expressions return the assigned value), so this reads as
-		// "compute distance, then check both it and player.alive" in one line.
+		// Comparing squared distance against 20*20 avoids an expensive sqrt()
+		// call, since we only need a threshold check here (see Player.updateThrust()
+		// for the one place in this codebase where the actual distance value IS
+		// needed, e.g. as a loop bound - not just a threshold comparison).
 		var dx:Float = this.x - game.player.x;
 		var dy:Float = this.y - game.player.y;
-		var distance:Float;
-		if ((distance = Math.sqrt(dx * dx + dy * dy)) < 20 && game.player.alive)
+		if (dx * dx + dy * dy < 20 * 20 && game.player.alive)
 		{
 			// 20px here is the arrow's own hit-radius against the player -
-			// unrelated to Actor.meleeReach, which only applies to melee weapons.
+			// unrelated to Actor.meleeHitRadius, which only applies to melee weapons.
 			//
 			// Parry window: the player can deflect the arrow not just while
 			// actively ATTACK-ing, but also during the brief COOLDOWN right
@@ -121,8 +121,8 @@ class Arrow extends FlxSprite
 			if (game.player.state == State.ATTACK || game.player.state == State.COOLDOWN)
 			{
 				// If the player is attacking or in cooldown state, break the arrow and deinitialize it
-				game.addArrowBroken(Direction.LEFT, x, y);
-				game.addArrowBroken(Direction.RIGHT, x, y);
+				game.addArrowBroken(ArrowSplitDirection.LEFT, x, y);
+				game.addArrowBroken(ArrowSplitDirection.RIGHT, x, y);
 				deInitialize();
 				
 				// Play the appropriate sound
