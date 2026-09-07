@@ -128,8 +128,9 @@ class Audio
 	 * (see `GameState.setState`, PLAY case).
 	 *
 	 * Note: if `isMusicOn` is false the first time this runs, `FlxG.sound.music`
-	 * is simply never assigned (stays null) - see the warning on
-	 * `isMusicPlaying()` below for why that matters.
+	 * is simply never assigned (stays null). This is exactly why
+	 * `resumeMusic()` below falls back to calling this function when it finds
+	 * `FlxG.sound.music` still null - see its doc for details.
 	 */
 	public static function playMusic():Void
 	{
@@ -162,35 +163,29 @@ class Audio
 	}
 	
 	/**
-	 * Resumes previously-paused background music.
-	 *
-	 * Caution: does not null-check `FlxG.sound.music` before calling
-	 * `.resume()` on it. Only safe to call if music has actually been
-	 * started at least once via `playMusic()` (see the note there and on
-	 * `isMusicPlaying()` below).
+	 * Resumes previously-paused background music - or, if music was never
+	 * started at all (`FlxG.sound.music` still null, e.g. the player had music
+	 * off before ever starting gameplay), starts it fresh via `playMusic()`
+	 * instead of calling `.resume()` on a null reference.
 	 */
 	public static function resumeMusic():Void
 	{
 		if (!isMusicOn) return;
 		
-		FlxG.sound.music.resume();
+		if (FlxG.sound.music == null)
+			playMusic();
+		else
+			FlxG.sound.music.resume();
 	}
 	
 	/**
 	 * Checks if the game's background music is currently playing.
 	 *
-	 * Caution: does not null-check `FlxG.sound.music`. This will throw if
-	 * called before music has ever been started - which can genuinely happen:
-	 * if the player disables music (`isMusicOn = false`) before ever starting
-	 * gameplay, `playMusic()`'s early-return means `FlxG.sound.music` stays
-	 * null. Re-enabling music via the 'M' key during play
-	 * (see `UserInput.update()`) calls this function first, which would then
-	 * crash on the null `.playing` access. Not fixed here - only documented.
-	 *
-	 * @return True if the music is playing, false otherwise.
+	 * @return True if the music is playing, false otherwise (including when
+	 * `FlxG.sound.music` is null - e.g. music has never been started).
 	 */
 	public static function isMusicPlaying():Bool
 	{
-		return FlxG.sound.music.playing;
+		return FlxG.sound.music != null && FlxG.sound.music.playing;
 	}
 }

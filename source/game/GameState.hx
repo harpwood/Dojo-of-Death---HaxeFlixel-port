@@ -878,9 +878,17 @@ class GameState extends FlxState
 	* `updateGameOverState()` calls `updateCamera()` (below) every frame while
 	* these tweens are running, to rebuild the grayscale/blur filters from
 	* whatever dV/iV/bF currently are mid-tween.
+	*
+	* `cancelTweensOf(this)` below guards against a quick-restart edge case:
+	* since these tweens run for a full second with nothing else ever
+	* cancelling them, restarting within that second would otherwise leave
+	* the old tween running in the background, still writing to dV/iV/bF
+	* well into the new PLAY session.
 	*/
 	function applyCameraFX():Void
 	{
+		FlxTween.cancelTweensOf(this); // clear any leftover tween first - see doc above
+
 		// Tween the value of dV (value to be decreased) from 1.0 to 0.5 over a duration of 1 second
 		FlxTween.tween(this, {dV : 0.5}, 1);
 
