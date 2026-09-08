@@ -368,7 +368,7 @@ class GameState extends FlxState
 			case 2: //GAME OVER
 				scoreElementsVisibility(false);
 				applyCameraFX();
-				gameOver.inititialize(kills, score, bestMultiplier);
+				gameOver.initialize(kills, score, bestMultiplier);
 		}
 
 		// Update the current state

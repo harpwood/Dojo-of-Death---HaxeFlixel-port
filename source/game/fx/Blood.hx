@@ -37,10 +37,11 @@ import game.util.Color;
 class Blood extends FlxSprite
 {
 
-	var game:GameState; // The parent FlxState instance reference
-	var dx:Float; 		// Horizontal drift speed (constant, no gravity applied)
-	var dy:Float; 		// Vertical "launch" speed - see update() for the sign convention, which is easy to misread
-	var _scale:Float; 	// The current scale of the blood sprite
+	var game:GameState; 		// The parent FlxState instance reference
+	var dx:Float; 				// Horizontal drift speed (constant, no gravity applied)
+	var dy:Float; 				// Vertical "launch" speed - see update() for the sign convention, which is easy to misread
+	var _scale:Float; 			// The current scale of the blood sprite
+	final ASSUMED_FPS:Int = 60; // The x-drift and scale-decay tuning below (dx range, 0.05) were originally tuned assuming ~60fps with no elapsed-scaling; multiplying by this converts them to a framerate-independent equivalent without needing to guess new numbers.
 
 	public var isActive(default, null):Bool; // Flag indicating if the blood sprite is currently being used
 
@@ -122,25 +123,23 @@ class Blood extends FlxSprite
 	 * DOWN, producing an arc. This double sign-flip (dy's own sign, and the minus
 	 * in `y -=`) is easy to misread as a bug at a glance - it isn't.
 	 *
-	 * Caution: unlike the vertical motion above (and unlike Smoke.hx's equivalent
-	 * effect, which scales all its per-frame changes by `elapsed`), the
-	 * horizontal drift (`x += dx`) and the scale shrink (`_scale -= 0.05`) below
-	 * are NOT multiplied by `elapsed`. That makes them frame-rate dependent:
-	 * on a faster machine (more update() calls per second) blood drifts sideways
-	 * faster and shrinks/disappears sooner in real time than on a slower one.
+	 * The horizontal drift and scale shrink below are multiplied by both
+	 * `ASSUMED_FPS` and `elapsed` (see that field's doc) - this converts their
+	 * originally per-frame-at-60fps tuning into a framerate-independent
+	 * equivalent, matching how the vertical motion above already behaves.
 	 *
 	 * @param elapsed The time elapsed since the last update.
 	 */
 	override public function update(elapsed:Float):Void
 	{
-		x += dx;
+		x += dx * ASSUMED_FPS * elapsed;
 
 		// Apply gravity effect to the blood sprite
 		dy -= 800 * elapsed;
 		y -= dy * elapsed;
 
 		// Decrease the scale of the blood sprite over time
-		_scale -= 0.05;
+		_scale -= 0.05 * ASSUMED_FPS * elapsed;
 		scale.set(_scale, _scale);
 
 		// If the scale becomes zero or negative, deinitialize the blood sprite

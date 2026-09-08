@@ -23,12 +23,11 @@ import game.util.State;
  * title screen after 30 seconds (see update() below).
  *
  * Layout note: the constructor below reuses a handful of local variables
- * (x, y, size, color, width) as a mutable "layout cursor" - each block
- * reassigns x/y/size before creating the next text element, rather than each
- * block declaring its own fresh values. The initial text strings ("100",
- * "0000000", "x321") are just placeholders for layout/testing - they're
- * always overwritten by real numbers in initialize() (misspelled as
- * `inititialize` below - see that method's doc) once a game actually ends.
+* (x, y, size, color, width) as a mutable "layout cursor" - each block
+* reassigns x/y/size before creating the next text element, rather than each
+* block declaring its own fresh values. The initial text strings ("100",
+* "0000000", "x321") are just placeholders for layout/testing - they're
+* always overwritten by real numbers in initialize() once a game actually ends.
  */
 class GameOver
 {
@@ -127,17 +126,11 @@ class GameOver
 	/**
 	* Initializes the game over screen with the specified values.
 	*
-	* Note: this method's name has a typo ("inititialize" - extra "i") baked
-	* into the public API; `GameState.setState()` calls it by this exact
-	* misspelled name. Renaming it correctly would mean updating both files
-	* together, so it's left as-is here (comment-only pass) but logged for a
-	* future cleanup.
-	*
 	* @param kills The number of kills achieved by the player.
 	* @param score The final score earned by the player.
 	* @param combo The best combo achieved by the player.
 	*/
-	public function inititialize(kills:Int, score:Int, combo:Int):Void
+	public function initialize(kills:Int, score:Int, combo:Int):Void
 	{
 		// Hide all text elements initially
 		setVisibility();

@@ -31,7 +31,8 @@ class ArrowBroken extends FlxSprite
 	var dx:Float;			// The horizontal speed of the broken arrow part
 	var dy:Float;			// The vertical speed of the broken arrow part
 	var rotation:Float;		// The rotation speed of the broken arrow part
-	
+	final ASSUMED_FPS:Int = 60; // Same reasoning as Blood.hx's ASSUMED_FPS - converts the alpha fade-out below from its original per-frame-at-60fps tuning into a framerate-independent equivalent.
+
 	public var isActive(default, null):Bool;	// Flag indicating if the broken arrow is currently being used
 
 	/**
@@ -107,12 +108,10 @@ class ArrowBroken extends FlxSprite
 	/**
 	 * Updates the broken arrow's position and visual effects.
 	 *
-	 * Caution: `alpha -= 0.03` below is a flat per-frame decrement, not scaled
-	 * by `elapsed` - same frame-rate-dependence issue as Blood.hx's `_scale -=
-	 * 0.05` (see that file's update() doc). Position/rotation above are all
-	 * correctly elapsed-scaled; only this fade-out isn't, so on a faster
-	 * machine these shards will visually fade out sooner in real time than on
-	 * a slower one.
+	 * `alpha -= 0.03 * ASSUMED_FPS * elapsed` uses the same ASSUMED_FPS
+	 * conversion as Blood.hx (see that field's doc there) to turn the
+	 * originally per-frame-at-60fps fade rate into a framerate-independent
+	 * equivalent, matching the position/rotation math above.
 	 *
 	 * @param elapsed The time elapsed since the last update.
 	 */
@@ -123,7 +122,7 @@ class ArrowBroken extends FlxSprite
 		x += dx * elapsed;		// Apply the horizontal velocity
 		y -= dy * elapsed;		// Apply the vertical velocity
 		angle += FlxAngle.asDegrees(rotation * elapsed); // Apply the rotation
-		alpha -= 0.03;	// Fade it out
+		alpha -= 0.03 * ASSUMED_FPS * elapsed;	// Fade it out
 		
 		// Deinitialize the broken arrow if its alpha value reaches 0
 		if (alpha <= 0) deInitialize();
