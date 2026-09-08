@@ -393,31 +393,14 @@ class GameState extends FlxState
 		// Update the player logic
 		player.update(elapsed);
 
-		// Two-pass removal: collect dead ninjas here first rather than calling
-		// ninjas.remove() while iterating the array above. Removing elements
-		// mid-loop would shift every later index down by one, causing this
-		// loop (which walks a fixed 0...ninjas.length range) to skip the
-		// element that slides into the just-vacated slot. Doing all the
-		// removals in a separate pass afterward avoids that.
-		var ninjasToRemove:Array<Ninja> = [];
-
+		// Ninjas that have reached NO_STATE are "sleeping" - pooled for reuse by
+		// GameState.addNinja() rather than removed from this array. Ninja.update()'s
+		// state-machine switch has no case for NO_STATE (it would hit the default
+		// throw), so they're explicitly skipped here instead.
 		for (i in 0...ninjas.length)
 		{
-			// Update each ninja's logic
+			if (ninjas[i].state == State.NO_STATE) continue;
 			ninjas[i].update(elapsed);
-			// Check if its state is NO_STATE
-			// Ninjas with NO_STATE are dead and their corpses are stamped on the bg
-			if (ninjas[i].state == State.NO_STATE)
-				ninjasToRemove.push(ninjas[i]);	// Copy the dead ninja into the array to be destroyed
-		}
-
-		// Remove the ninjas that need to be removed from the ninjas array and destroy them
-		for (j in 0...ninjasToRemove.length)
-		{
-			var i:Int = ninjas.indexOf(ninjasToRemove[j]);
-			var ninja:Ninja = ninjas[i];
-			ninjas.remove(ninja);
-			ninja = null; // no-op, see the same pattern in reset() above
 		}
 
 		// Update the cursor that shows the player's direction
@@ -523,14 +506,29 @@ class GameState extends FlxState
 		// Randomly determine the type of ninja (80% Sword, 20% Bow)
 		var type = Math.random() > 0.2 ? Type.SWORD : Type.BOW;
 
-		// Create a new instance of the Ninja class
-		var ninja = new Ninja(this);
+		// Look for an existing "sleeping" (NO_STATE) ninja to reuse before
+		// creating a new one. Currently this never finds anything - dead ninjas
+		// are still removed from `ninjas` immediately in updatePlayState() - but
+		// once that changes (see the note there), this reuse path becomes live.
+		var ninja:Ninja = null;
+		for (i in 0...ninjas.length)
+		{
+			if (ninjas[i].state == State.NO_STATE)
+			{
+				ninja = ninjas[i];
+				break;
+			}
+		}
 
-		// Initialize the ninja with the determined type
+		if (ninja == null)
+		{
+			// No reusable ninja found - create a new one and add it to the array
+			ninja = new Ninja(this);
+			ninjas.push(ninja);
+		}
+
+		// Initialize the ninja (fresh or reused) with the determined type
 		ninja.initialize(type);
-
-		// Add the ninja to the ninjas array
-		ninjas.push(ninja);
 	}
 
 	/**

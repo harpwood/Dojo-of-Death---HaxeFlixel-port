@@ -100,6 +100,9 @@ class Ninja extends Actor
 	* reflection `Type`, it can't be referred to by its plain name here.
 	*/
 	var type: Int;
+	
+	// which type this instance's sprites are currently baked as (-1 = never baked yet)
+	var bakedType:Int = -1; 
 
 	// The current charge timer for the ninja before attacking
 	var chargeTimer: Float;
@@ -114,7 +117,8 @@ class Ninja extends Actor
 	var meleeEngageRange: Int;	// engage distance for Sword ninjas
 
 	var rangedEngageRange: Int;	// engage distance for Bow ninjas
-
+	
+	var id:Int;
 	/**
 	* Creates a new instance of an enemy ninja.
 	*
@@ -183,6 +187,14 @@ class Ninja extends Actor
 		actor.x = Math.random() * 500 + 100;
 		actor.y = Math.random() * 400 + 100;
 
+		// Revive (Flixel's own exists/alive flags) in case this instance is being
+		// reused from the pool (see Ninja.deInitialize(), which calls kill() on
+		// both sprites) - a freshly-constructed sprite defaults to exists=true, so
+		// this was never needed before pooling existed, but a killed sprite stays
+		// exists=false forever without an explicit revive().
+		actor.revive();
+		shadow.revive();
+
 		// Make the ninja character and shadow visible, flag his as alive
 		actor.visible = true;
 		shadow.visible = true;
@@ -210,15 +222,13 @@ class Ninja extends Actor
 	{
 		super.deInitialize();
 
-		// Remove and destroy the Ninja actor
-		var actorToKill = game.actors.remove(actor, true);
-		actorToKill.kill();
-		actor.destroy();
+		
+		// Clear any pending onFinish listener the moment this life ends - see the
+    	// note in hit() for why this can't wait until the NEXT hit() call.
+    	actor.animation.onFinish.removeAll();
 
-		// Remove and destroy the Ninja shadow
-		var shadowToKill = game.shadows.remove(shadow, true);
-		shadowToKill.kill();
-		shadow.destroy();
+		actor.kill();
+		shadow.kill();
 	}
 
 	/**
@@ -274,6 +284,7 @@ class Ninja extends Actor
 	*/
 	public function hit():Void
 	{
+		 
 		// update the ninja's state and alive flag
 		state = State.DEATH;
 		alive = false;
@@ -630,6 +641,7 @@ class Ninja extends Actor
 	 */
 	function killActor():Void
 	{
+
 		// For performance, "stamp" the dead body and its shadow onto the
 		// background image (a static bitmap) instead of keeping them as live
 		// sprites - see Background.hx for why. Offsets (-36/-28 and -36/+8)
