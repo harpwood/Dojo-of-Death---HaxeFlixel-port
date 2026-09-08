@@ -38,10 +38,9 @@ class Pause extends FlxSubState
 	var pauseText:FlxText;
 	
 	/**
-	 * Note: `BGColor` is accepted but never used below - the substate's
-	 * background is always `Color.SEMI_TRANSP_BLACK` regardless of what's
-	 * passed here. Passing a custom color to this constructor currently has
-	 * no effect.
+	 * `BGColor` defaults to `Color.SEMI_TRANSP_BLACK`, which is the darkening
+	 * the pause screen has always shown - callers don't need to pass anything
+	 * unless they want a different overlay color.
 	 */
 	public function new(game:GameState, BGColor:FlxColor=Color.SEMI_TRANSP_BLACK) 
 	{

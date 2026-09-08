@@ -15,6 +15,7 @@ import game.GameState;
 import game.util.Audio;
 import game.util.State;
 import game.util.Type;
+import openfl.display.BitmapData;
 import openfl.filters.ColorMatrixFilter;
 import openfl.geom.Point;
 
@@ -80,6 +81,11 @@ class Ninja extends Actor
 
 	// Height of the sprites for each ninja type
 	static var spriteHeight: Array<Int> = [64, 60];
+
+	// Cache of the fully-filtered shadow bitmap, computed once per ninja type
+	// (Type.SWORD/Type.BOW) instead of re-running the expensive per-pixel
+	// ColorMatrixFilter on every single ninja spawn. See bakeNinja() below.
+	static var filteredShadowCache:Array<BitmapData> = [null, null];
 
 	/**
 	* The type of the ninja.
@@ -275,6 +281,14 @@ class Ninja extends Actor
 		// Play death animation for the ninja and shadow
 		actor.animation.play(animNames[animFacingIndex][ANIM_DEATH], true);
 		shadow.animation.play(animNames[animFacingIndex][ANIM_DEATH]);
+
+		// Clear any listener from a previous life before registering a fresh one.
+		// Currently a no-op (each ninja is destroyed after one death today - see
+		// deInitialize()), but onFinish is a persistent signal that's only ever
+		// cleared when the whole sprite is destroyed. Without this guard, reusing
+		// this same instance in the future (pooling) would let listeners from
+		// every previous death stack up here, all firing together on the next one.
+		actor.animation.onFinish.removeAll();
 
 		// Callback function to handle the logic when death animation ends
 		actor.animation.onFinish.add(function(s:String):Void
@@ -645,8 +659,20 @@ class Ninja extends Actor
 		// scale the shadow sprite to look like a real shadow
 		shadow.scale.y = 0.5;
 
-		// Apply a semi-transparent black color to the shadow
-		shadow.pixels.applyFilter(shadow.pixels, shadow.pixels.rect, new Point(), new ColorMatrixFilter(shadowColorMatrixFilter));
+		if (filteredShadowCache[type] == null)
+		{
+			// First ninja of this type this session: run the (expensive, especially
+			// on native/neko targets) per-pixel color filter once, then cache the
+			// result so every subsequent ninja of the same type can skip it.
+			shadow.pixels.applyFilter(shadow.pixels, shadow.pixels.rect, new Point(), new ColorMatrixFilter(shadowColorMatrixFilter));
+			filteredShadowCache[type] = shadow.pixels.clone();
+		}
+		else
+		{
+			// Already computed for this type: copy the cached, pre-filtered pixels
+			// directly (a fast raw memory copy) instead of re-running the filter.
+			shadow.pixels.copyPixels(filteredShadowCache[type], filteredShadowCache[type].rect, new Point());
+		}
 	}
 }
 
