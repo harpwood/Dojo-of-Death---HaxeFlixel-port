@@ -2,6 +2,12 @@
 
 Thank you for checking out the "Dojo of Death" repository! This repository contains the source code of the game "Dojo of Death" that has been ported to HaxeFlixel for educational and nostalgic purposes. I hope this repository serves as a valuable learning resource for HaxeFlixel, providing a complete game example project.
 
+## Recent Highlights
+
+The codebase recently went through a thorough cleanup and comment-clarity pass, plus a batch of real bug fixes and performance work - including finally tracking down a years-old, platform-specific stutter (Neko-only, tied to how enemies were spawned) that had gone unsolved since the original port. The fix involved implementing proper object pooling for enemies, matching the pattern already used for effects like blood and arrows, along with a couple of subtler Flixel animation-signal bugs uncovered along the way.
+
+If you're learning HaxeFlixel, this project is a reasonably compact but complete example covering things like object pooling, enemy AI state machines, camera effects/tweening, and pooled visual effects - with comments aimed at explaining not just *what* the code does, but *why*. See [CHANGELOG.md](../CHANGELOG.md) for the full history.
+
 ## Play the Game
 
 You can play the game directly in your browser by following this [link](https://harpwood.itch.io/dojo-of-death).
@@ -27,12 +33,12 @@ We hope you enjoy playing "Dojo of Death" and find value in exploring the HaxeFl
 ## Requirements & Compatibility
 
 - **Haxe:** 4.x+
-- **HaxeFlixel:** 5.x+
-- **Target Platforms:** HTML5, Desktop (Windows / macOS / Linux)
+- **HaxeFlixel:** 6.x+
+- **Target Platforms:** HTML5, Desktop (Windows / macOS / Linux), Neko
 
 ## Versioning & Changelog
 
-Current Version: **v1.0.1**
+Current Version: **v1.0.8**
 
 For a detailed list of changes and version history, see the [CHANGELOG.md](../CHANGELOG.md).
 
