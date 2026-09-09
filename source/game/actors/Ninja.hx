@@ -11,6 +11,7 @@
 
 package game.actors;
 
+import flixel.FlxSprite;
 import game.GameState;
 import game.util.Audio;
 import game.util.State;
@@ -239,6 +240,24 @@ class Ninja extends Actor
 	 * ---------------------------------------------
 	 */
 
+	/**
+	 * Warms up the per-type shadow filter cache (see filteredShadowCache above)
+	 * without spawning a real, visible gameplay ninja - a throwaway FlxSprite
+	 * is used purely to load the shadow spritesheet and run the filter once,
+	 * then discarded. Meant to be called once per type during loading (see
+	 * GameState.create()), so the one-time hitch happens before the player
+	 * ever sees gameplay, instead of mid-fight on the first real spawn.
+	 */
+	static public function preBakeShadow(type:Int):Void
+	{
+		if (filteredShadowCache[type] != null) return; // already baked
+
+		var temp = new FlxSprite();
+		temp.loadGraphic(asset[type], true, spriteWidth[type], spriteHeight[type], true);
+		temp.pixels.applyFilter(temp.pixels, temp.pixels.rect, new Point(), new ColorMatrixFilter(Actor.shadowColorMatrixFilter));
+		filteredShadowCache[type] = temp.pixels.clone();
+		temp.destroy();
+	}
 	/**
 	* Updates the ninja's state and behavior.
 	*
@@ -676,7 +695,7 @@ class Ninja extends Actor
 			// First ninja of this type this session: run the (expensive, especially
 			// on native/neko targets) per-pixel color filter once, then cache the
 			// result so every subsequent ninja of the same type can skip it.
-			shadow.pixels.applyFilter(shadow.pixels, shadow.pixels.rect, new Point(), new ColorMatrixFilter(shadowColorMatrixFilter));
+			shadow.pixels.applyFilter(shadow.pixels, shadow.pixels.rect, new Point(), new ColorMatrixFilter(Actor.shadowColorMatrixFilter));
 			filteredShadowCache[type] = shadow.pixels.clone();
 		}
 		else

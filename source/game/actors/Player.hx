@@ -108,7 +108,7 @@ class Player extends Actor
 		shadow.flipY = true;
 
 		// Apply a semi-transparent black color to the shadow
-		shadow.pixels.applyFilter(shadow.pixels, shadow.pixels.rect, new Point(), new ColorMatrixFilter(shadowColorMatrixFilter));
+		shadow.pixels.applyFilter(shadow.pixels, shadow.pixels.rect, new Point(), new ColorMatrixFilter(Actor.shadowColorMatrixFilter));
 
 		// Initialize the FlxPoint to store mouse data
 		mouse = new FlxPoint(-1, -1);

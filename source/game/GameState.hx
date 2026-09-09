@@ -197,6 +197,13 @@ class GameState extends FlxState
 		// Set the initial state
 		state = State.INTRO;
 
+		// Pre-bake each ninja type's filtered shadow now, during loading, so the
+		// one-time per-type cost (see Ninja.preBakeShadow()'s doc) happens before
+		// the player ever sees gameplay - instead of causing a hitch mid-fight the
+		// first time each type actually spawns.
+		Ninja.preBakeShadow(Type.SWORD);
+		Ninja.preBakeShadow(Type.BOW);
+
 		// Start the game
 		start();
 	}

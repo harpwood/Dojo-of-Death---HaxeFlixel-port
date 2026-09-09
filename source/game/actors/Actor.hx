@@ -133,8 +133,17 @@ class Actor
 	* The `shadowColorMatrixFilter` array contains a set of floating-point values that define
 	* the transformation matrix used for the color manipulation. By adjusting the values in the array,
 	* you can control the intensity, transparency, and color of the shadow.
+	*
+	* Static because this matrix is identical for every Actor instance (Player
+	* and every Ninja alike) - no need to rebuild the same 20 numbers per
+	* instance when one shared copy works for all of them.
 	*/
-	var shadowColorMatrixFilter: Array<Float>;
+	static var shadowColorMatrixFilter:Array<Float> = [
+		0, 0, 0, 0, 0,
+		0, 0, 0, 0, 0,
+		0, 0, 0, 0, 0,
+		0, 0, 0, 0.15, 0  // 0.15 = alpha (shadow opacity)
+	];
 
 	/**
 	* The DEAD_ANIM variable stores the index of the randomly chosen DEAD animation sprite.
@@ -209,16 +218,6 @@ class Actor
 
 		// Default facing is SIDE (see animFacingIndex field doc above for what this means)
 		animFacingIndex = Facing.SIDE;
-
-		// Builds the semi-transparent black matrix described in shadowColorMatrixFilter's
-		// field doc above: RGB rows all zero (forces black), alpha row set to 0.15.
-		var a = 0.15; //alpha
-		shadowColorMatrixFilter =  [
-			0, 0, 0, 0, 0,
-			0, 0, 0, 0, 0,
-			0, 0, 0, 0, 0,
-			0, 0, 0, a, 0
-		];
 
 		actor = new FlxSprite(); 	 // Create a new FlxSprite instance to represent the actor's graphic representation
 		shadow = new FlxSprite(); 	 // Create a new FlxSprite instance to represent the shadow sprite for the actor
